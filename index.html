@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clientes Aqui</title>
+    <meta name="description" content="Encontre padarias, supermercados e empórios a granel próximos de você." />
+    <meta name="theme-color" content="#1238d1" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231238d1'/%3E%3Cpath fill='%23fff' d='M32 12a16 16 0 0 0-16 16c0 12 16 25 16 25s16-13 16-25a16 16 0 0 0-16-16Zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12Z'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Clientes Aqui — início">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M16 3.5a9.5 9.5 0 0 0-9.5 9.5C6.5 20.2 16 28.5 16 28.5S25.5 20.2 25.5 13A9.5 9.5 0 0 0 16 3.5Zm0 13.1a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2Z"/></svg>
+        </span>
+        <span>clientes <strong>aqui</strong></span>
+      </a>
+      <nav class="topnav" aria-label="Navegação principal">
+        <button class="nav-link is-active" type="button" data-view-target="search">Buscar</button>
+        <button class="nav-link" type="button" data-view-target="clients">Clientes</button>
+      </nav>
+    </header>
+
+    <main class="page-shell" id="search-view" data-view="search">
+      <section class="search-panel" aria-labelledby="page-title">
+        <div class="intro">
+          <p class="eyebrow">PROSPECÇÃO LOCAL</p>
+          <h1 id="page-title">Onde você quer encontrar clientes?</h1>
+          <p>Informe um endereço ou compartilhe sua localização para começar.</p>
+        </div>
+
+        <form id="search-form" novalidate>
+          <div class="field-group">
+            <label for="address">Local de busca</label>
+            <div class="location-row">
+              <div class="input-wrap autocomplete-wrap">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21s7-5.4 7-12a7 7 0 1 0-14 0c0 6.6 7 12 7 12Zm0-9a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+                <input id="address" name="address" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="address-suggestions" aria-expanded="false" placeholder="Comece a digitar a rua, bairro ou cidade" />
+                <div class="address-suggestions" id="address-suggestions" role="listbox" aria-label="Sugestões de endereço" hidden></div>
+              </div>
+              <button class="location-button" id="location-button" type="button">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.1A7 7 0 0 0 13 5.1V3a1 1 0 1 0-2 0v2.1A7 7 0 0 0 5.1 11H3a1 1 0 1 0 0 2h2.1a7 7 0 0 0 5.9 5.9V21a1 1 0 1 0 2 0v-2.1a7 7 0 0 0 5.9-5.9H21a1 1 0 1 0 0-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
+                <span>Usar minha localização</span>
+              </button>
+            </div>
+            <p class="field-note" id="location-note">A sua localização só será usada nesta busca.</p>
+          </div>
+
+          <fieldset class="field-group category-group">
+            <div class="legend-row">
+              <legend>Que tipo de cliente você procura?</legend>
+              <button class="select-all" id="select-all" type="button">Limpar seleção</button>
+            </div>
+
+            <div class="category-grid">
+              <label class="category-card" data-category-card="padaria">
+                <input type="checkbox" name="category" value="padaria" checked />
+                <span class="checkmark" aria-hidden="true"></span>
+                <span class="category-icon bakery" aria-hidden="true">
+                  <svg viewBox="0 0 32 32"><path d="M8 26h16a4 4 0 0 0 4-4v-5a8 8 0 0 0-8-8h-8a8 8 0 0 0-8 8v5a4 4 0 0 0 4 4Zm3-12 3 3m0-5 3 3m1-3 3 3"/></svg>
+                </span>
+                <span><strong>Padarias</strong><small>Pães e confeitarias</small></span>
+              </label>
+
+              <label class="category-card" data-category-card="supermercado">
+                <input type="checkbox" name="category" value="supermercado" checked />
+                <span class="checkmark" aria-hidden="true"></span>
+                <span class="category-icon market" aria-hidden="true">
+                  <svg viewBox="0 0 32 32"><path d="M4 7h3l2.2 12h14.6l2.4-8.5H9M12 25a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm13 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
+                </span>
+                <span><strong>Supermercados</strong><small>Mercados e supermercados</small></span>
+              </label>
+
+              <label class="category-card" data-category-card="emporio">
+                <input type="checkbox" name="category" value="emporio" checked />
+                <span class="checkmark" aria-hidden="true"></span>
+                <span class="category-icon bulk" aria-hidden="true">
+                  <svg viewBox="0 0 32 32"><path d="M8 7h16l-1.5 19h-13L8 7Zm3-3h10M12 13c2.5 0 5 2.2 8 0m-9 6c2.5 0 5 2.2 10 0"/></svg>
+                </span>
+                <span><strong>Empórios a granel</strong><small>Empórios e lojas naturais</small></span>
+              </label>
+            </div>
+
+            <div class="market-filter" id="market-filter">
+              <label class="switch-row" for="hide-large-chains">
+                <input id="hide-large-chains" type="checkbox" checked />
+                <span class="switch" aria-hidden="true"></span>
+                <span class="switch-copy">
+                  <strong>Priorizar mercados menores</strong>
+                  <small>Ocultar grandes redes de supermercados dos resultados</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-group radius-group">
+            <legend>Qual distância você quer pesquisar?</legend>
+            <div class="radius-options">
+              <label><input type="radio" name="radius" value="1" /><span>1 km</span></label>
+              <label><input type="radio" name="radius" value="5" checked /><span>5 km</span></label>
+              <label><input type="radio" name="radius" value="10" /><span>10 km</span></label>
+            </div>
+          </fieldset>
+
+          <div class="form-error" id="form-error" role="alert" hidden></div>
+
+          <button class="search-button" id="search-button" type="submit">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m2.35-5.15a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"/></svg>
+            <span>Buscar clientes próximos</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="results-panel" id="results-panel" aria-labelledby="results-title">
+        <div class="results-empty" id="empty-state">
+          <div class="radar" aria-hidden="true">
+            <span></span><span></span><span></span>
+            <svg viewBox="0 0 32 32"><path d="M16 4a9 9 0 0 0-9 9c0 7.2 9 15 9 15s9-7.8 9-15a9 9 0 0 0-9-9Zm0 12.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg>
+          </div>
+          <h2 id="results-title">Seus próximos clientes estão por aqui</h2>
+          <p>Escolha o local e as categorias para ver os estabelecimentos mais próximos.</p>
+        </div>
+
+        <div class="loading-state" id="loading-state" role="status" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <strong>Procurando oportunidades...</strong>
+          <span id="loading-message">Isso pode levar alguns segundos.</span>
+        </div>
+
+        <div class="results-content" id="results-content" hidden>
+          <div class="results-heading">
+            <div>
+              <p class="eyebrow">RESULTADOS PRÓXIMOS</p>
+              <h2><span id="result-count">0</span> potenciais clientes</h2>
+              <p id="result-location"></p>
+            </div>
+            <span class="radius-pill" id="radius-pill">até 5 km</span>
+          </div>
+          <div class="result-chips" id="result-chips" aria-label="Resumo por categoria"></div>
+          <div class="map-block">
+            <div class="map-header">
+              <strong>Mapa dos clientes</strong>
+              <span>Seu local aparece em azul</span>
+            </div>
+            <div id="results-map" role="region" aria-label="Mapa com seu local de busca e os clientes próximos"></div>
+          </div>
+          <div class="result-list" id="result-list"></div>
+          <p class="data-note" id="data-note">Os resultados dependem das informações públicas disponíveis no mapa.</p>
+        </div>
+      </section>
+    </main>
+
+    <main class="clients-shell" id="clients-view" data-view="clients" hidden>
+      <section class="clients-intro">
+        <div>
+          <p class="eyebrow">CARTEIRA DE CLIENTES</p>
+          <h1>Seus clientes no mapa</h1>
+          <p>Marque no mapa os clientes que você já atende. Cada conta visualiza somente os próprios dados.</p>
+        </div>
+        <div class="clients-account" id="clients-account" hidden>
+          <span id="account-email"></span>
+          <button class="text-button" id="signout-button" type="button">Sair</button>
+        </div>
+      </section>
+
+      <section class="auth-card" id="auth-card">
+        <div class="auth-copy">
+          <span class="auth-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12v10H6V10Zm6 4v2"/></svg>
+          </span>
+          <div>
+            <h2>Entre para salvar seus clientes</h2>
+            <p>Use seu e-mail e senha. Seus pontos ficam disponíveis em qualquer dispositivo.</p>
+          </div>
+        </div>
+        <form id="auth-form" class="auth-form" novalidate>
+          <label>E-mail<input id="auth-email" type="email" autocomplete="email" placeholder="voce@empresa.com" required /></label>
+          <label>Senha<input id="auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="Mínimo de 6 caracteres" required /></label>
+          <div class="auth-actions">
+            <button class="primary-button" id="signin-button" type="submit">Entrar</button>
+            <button class="secondary-button" id="signup-button" type="button">Criar conta</button>
+          </div>
+          <p class="inline-message" id="auth-message" role="status" hidden></p>
+        </form>
+      </section>
+
+      <section class="clients-workspace" id="clients-workspace" hidden>
+        <div class="clients-toolbar">
+          <div>
+            <strong><span id="saved-client-count">0</span> clientes salvos</strong>
+            <span>Clique em um marcador para ver os detalhes.</span>
+          </div>
+          <div class="toolbar-actions">
+            <button class="secondary-button compact" id="center-location-button" type="button">Minha localização</button>
+            <button class="primary-button compact" id="new-client-button" type="button">+ Adicionar cliente</button>
+          </div>
+        </div>
+
+        <div class="clients-grid">
+          <div class="client-map-card">
+            <div class="map-instruction" id="map-instruction">Mapa de Belo Horizonte</div>
+            <div id="clients-map" role="region" aria-label="Mapa dos clientes salvos em Belo Horizonte"></div>
+          </div>
+
+          <aside class="clients-sidebar">
+            <form class="client-form" id="client-form" hidden>
+              <div class="form-heading">
+                <div><p class="eyebrow">NOVO PONTO</p><h2 id="client-form-title">Adicionar cliente</h2></div>
+                <button class="icon-button" id="cancel-client-button" type="button" aria-label="Fechar formulário">×</button>
+              </div>
+              <p class="form-tip">Clique no mapa para marcar o local exato.</p>
+              <label>Nome do cliente<input id="client-name" type="text" maxlength="120" required /></label>
+              <label>Categoria
+                <select id="client-category" required>
+                  <option value="padaria">Padaria</option>
+                  <option value="supermercado">Supermercado</option>
+                  <option value="emporio">Empório a granel</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </label>
+              <label>Endereço<input id="client-address" type="text" maxlength="240" placeholder="Rua, número e bairro" /></label>
+              <div class="two-fields">
+                <label>Telefone<input id="client-phone" type="tel" maxlength="40" /></label>
+                <label>Contato<input id="client-contact" type="text" maxlength="100" placeholder="Nome do contato" /></label>
+              </div>
+              <label>Observações<textarea id="client-notes" maxlength="1000" rows="3"></textarea></label>
+              <div class="selected-point" id="selected-point">Nenhum ponto marcado</div>
+              <p class="inline-message" id="client-form-message" role="status" hidden></p>
+              <button class="primary-button full" id="save-client-button" type="submit">Salvar cliente</button>
+            </form>
+
+            <div class="clients-list-wrap" id="clients-list-wrap">
+              <div class="list-heading"><h2>Clientes</h2><span id="clients-list-status">Carregando...</span></div>
+              <div class="saved-client-list" id="saved-client-list"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="./app.js?v=7"></script>
+    <script src="./clients.js?v=1"></script>
+  </body>
+</html>
