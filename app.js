@@ -185,7 +185,7 @@ function renderLeafletMap(center, results) {
   if (!window.L) { els.mapElement.innerHTML = '<div class="map-unavailable">O mapa não carregou. Atualize a página para tentar novamente.</div>'; return; }
   if (!state.map) {
     state.map = window.L.map(els.mapElement, { scrollWheelZoom: false, zoomControl: true, preferCanvas: true });
-    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 18, subdomains: "abcd", detectRetina: false, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO' }).addTo(state.map);
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, detectRetina: false, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(state.map);
     state.markerLayer = window.L.layerGroup().addTo(state.map);
   }
   state.markerLayer.clearLayers(); state.markersById.clear(); const points = [[center.lat, center.lon]];
