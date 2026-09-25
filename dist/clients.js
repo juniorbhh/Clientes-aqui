@@ -141,11 +141,10 @@
   function initializeMap() {
     if (state.map || !window.L) return;
     state.map = window.L.map(els.mapElement, { zoomControl: true, scrollWheelZoom: true, preferCanvas: true }).setView([BH_CENTER.lat, BH_CENTER.lon], 12);
-    window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 18,
-      subdomains: "abcd",
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
       detectRetina: false,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; CARTO',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(state.map);
     state.markers = window.L.layerGroup().addTo(state.map);
     state.map.on("click", (event) => {
