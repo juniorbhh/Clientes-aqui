@@ -14,10 +14,16 @@
     clients: [],
     map: null,
     markers: null,
+    markersByClientId: new Map(),
     draftMarker: null,
     locationMarker: null,
+    locationAccuracyCircle: null,
     selectedPoint: null,
     editingId: null,
+    statusFilter: "all",
+    mapSearchSuggestions: [],
+    mapSearchTimer: null,
+    mapSearchRequestId: 0,
   };
 
   const els = {
@@ -39,6 +45,7 @@
     list: document.querySelector("#saved-client-list"),
     newClient: document.querySelector("#new-client-button"),
     centerLocation: document.querySelector("#center-location-button"),
+    statusFilters: [...document.querySelectorAll('input[name="client-status-filter"]')],
     form: document.querySelector("#client-form"),
     formTitle: document.querySelector("#client-form-title"),
     formMessage: document.querySelector("#client-form-message"),
@@ -46,6 +53,7 @@
     saveClient: document.querySelector("#save-client-button"),
     name: document.querySelector("#client-name"),
     category: document.querySelector("#client-category"),
+    statuses: [...document.querySelectorAll('input[name="client-status"]')],
     address: document.querySelector("#client-address"),
     phone: document.querySelector("#client-phone"),
     contact: document.querySelector("#client-contact"),
@@ -53,7 +61,12 @@
     selectedPoint: document.querySelector("#selected-point"),
     mapInstruction: document.querySelector("#map-instruction"),
     mapElement: document.querySelector("#clients-map"),
+    mapSearchInput: document.querySelector("#client-map-address"),
+    mapSearchButton: document.querySelector("#client-map-search-button"),
+    mapSearchSuggestions: document.querySelector("#client-map-suggestions"),
   };
+
+  const statusLabels = { ativo: "Ativo", espera: "Em espera" };
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -63,6 +76,15 @@
     element.textContent = message;
     element.dataset.type = type;
     element.hidden = !message;
+  }
+
+  function currentClientStatus() {
+    return els.statuses.find((input) => input.checked)?.value || "ativo";
+  }
+
+  function visibleClients() {
+    if (state.statusFilter === "all") return state.clients;
+    return state.clients.filter((client) => (client.client_status || "ativo") === state.statusFilter);
   }
 
   function saveSession(session) {
@@ -153,11 +175,11 @@
     });
   }
 
-  function markerIcon(category = "outro") {
+  function markerIcon(category = "outro", clientStatus = "ativo") {
     const letter = categoryLabels[category]?.charAt(0) || "C";
     return window.L.divIcon({
       className: "map-marker-shell",
-      html: `<span class="map-client-pin ${escapeHtml(category)}"><span>${escapeHtml(letter)}</span></span>`,
+      html: `<span class="map-client-pin ${escapeHtml(category)} status-${escapeHtml(clientStatus)}"><span>${escapeHtml(letter)}</span></span>`,
       iconSize: [29, 36],
       iconAnchor: [14, 32],
       popupAnchor: [0, -30],
@@ -167,32 +189,42 @@
   function renderMarkers() {
     if (!state.map || !state.markers) return;
     state.markers.clearLayers();
-    state.clients.forEach((client) => {
-      const marker = window.L.marker([client.latitude, client.longitude], { icon: markerIcon(client.category) });
-      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}</div>`);
+    state.markersByClientId.clear();
+    visibleClients().forEach((client) => {
+      const clientStatus = client.client_status || "ativo";
+      const marker = window.L.marker([client.latitude, client.longitude], { icon: markerIcon(client.category, clientStatus) });
+      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span><span class="popup-status status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}<div class="popup-notes"><strong>Observações</strong>${escapeHtml(client.notes || "Nenhuma observação cadastrada.")}</div></div>`);
       marker.on("click", () => highlightClient(client.id));
       marker.addTo(state.markers);
+      state.markersByClientId.set(client.id, marker);
     });
   }
 
   function renderList() {
+    const clients = visibleClients();
     els.count.textContent = String(state.clients.length);
-    els.listStatus.textContent = state.clients.length ? "Mais recentes primeiro" : "Nenhum cliente cadastrado";
-    if (!state.clients.length) {
-      els.list.innerHTML = '<div class="clients-empty"><strong>Seu mapa está pronto</strong><p>Adicione o primeiro cliente e marque o local exato no mapa.</p></div>';
+    if (!state.clients.length) els.listStatus.textContent = "Nenhum cliente cadastrado";
+    else if (state.statusFilter === "all") els.listStatus.textContent = "Mais recentes primeiro";
+    else els.listStatus.textContent = `${clients.length} ${statusLabels[state.statusFilter].toLowerCase()}`;
+    if (!clients.length) {
+      const emptyMessage = state.clients.length ? "Nenhum cliente encontrado neste filtro." : "Adicione o primeiro cliente e marque o local exato no mapa.";
+      els.list.innerHTML = `<div class="clients-empty"><strong>${state.clients.length ? "Filtro sem resultados" : "Seu mapa está pronto"}</strong><p>${emptyMessage}</p></div>`;
       return;
     }
-    els.list.innerHTML = state.clients.map((client) => `
-      <article class="saved-client-card" data-client-id="${escapeHtml(client.id)}">
+    els.list.innerHTML = clients.map((client) => {
+      const clientStatus = client.client_status || "ativo";
+      return `
+      <article class="saved-client-card status-${escapeHtml(clientStatus)}" data-client-id="${escapeHtml(client.id)}">
         <button class="client-card-main" type="button" data-focus-client="${escapeHtml(client.id)}">
-          <span class="client-dot ${escapeHtml(client.category)}"></span>
-          <span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(categoryLabels[client.category] || "Cliente")}${client.address ? ` · ${escapeHtml(client.address)}` : ""}</small></span>
+          <span class="client-dot status-${escapeHtml(clientStatus)}"></span>
+          <span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(categoryLabels[client.category] || "Cliente")}${client.address ? ` · ${escapeHtml(client.address)}` : ""}</small><span class="client-status-badge status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span></span>
         </button>
         <div class="client-card-actions">
           <button type="button" data-edit-client="${escapeHtml(client.id)}">Editar</button>
           <button class="danger-link" type="button" data-delete-client="${escapeHtml(client.id)}">Excluir</button>
         </div>
-      </article>`).join("");
+      </article>`;
+    }).join("");
     els.list.querySelectorAll("[data-focus-client]").forEach((button) => button.addEventListener("click", () => focusClient(button.dataset.focusClient)));
     els.list.querySelectorAll("[data-edit-client]").forEach((button) => button.addEventListener("click", () => editClient(button.dataset.editClient)));
     els.list.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", () => void deleteClient(button.dataset.deleteClient)));
@@ -206,6 +238,7 @@
     const client = state.clients.find((item) => item.id === id);
     if (!client || !state.map) return;
     state.map.setView([client.latitude, client.longitude], 16, { animate: true });
+    state.markersByClientId.get(id)?.openPopup();
     highlightClient(id);
   }
 
@@ -214,7 +247,7 @@
     els.listStatus.textContent = "Carregando...";
     try {
       const data = await api("/rest/v1/clients?select=*&order=created_at.desc", { accessToken: state.session.access_token });
-      state.clients = Array.isArray(data) ? data : [];
+      state.clients = Array.isArray(data) ? data.map((client) => ({ ...client, client_status: client.client_status || "ativo" })) : [];
       renderList();
       renderMarkers();
     } catch (error) {
@@ -232,7 +265,7 @@
     els.selectedPoint.textContent = `Ponto marcado: ${state.selectedPoint.lat.toFixed(5)}, ${state.selectedPoint.lon.toFixed(5)}`;
     els.selectedPoint.classList.add("is-selected");
     if (state.draftMarker) state.draftMarker.remove();
-    state.draftMarker = window.L.marker([lat, lon], { icon: markerIcon(els.category.value), zIndexOffset: 1200 }).addTo(state.map);
+    state.draftMarker = window.L.marker([lat, lon], { icon: markerIcon(els.category.value, currentClientStatus()), zIndexOffset: 1200 }).addTo(state.map);
     if (moveMap) state.map.panTo([lat, lon]);
   }
 
@@ -242,6 +275,8 @@
     els.formTitle.textContent = client ? "Editar cliente" : "Adicionar cliente";
     els.name.value = client?.name || "";
     els.category.value = client?.category || "padaria";
+    const clientStatus = client?.client_status || "ativo";
+    els.statuses.forEach((input) => { input.checked = input.value === clientStatus; });
     els.address.value = client?.address || "";
     els.phone.value = client?.phone || "";
     els.contact.value = client?.contact_name || "";
@@ -282,6 +317,7 @@
       user_id: state.session.user.id,
       name: els.name.value.trim(),
       category: els.category.value,
+      client_status: currentClientStatus(),
       address: els.address.value.trim() || null,
       phone: els.phone.value.trim() || null,
       contact_name: els.contact.value.trim() || null,
@@ -369,19 +405,104 @@
     renderAuthState();
   }
 
+  function closeMapSearchSuggestions() {
+    state.mapSearchSuggestions = [];
+    els.mapSearchSuggestions.innerHTML = "";
+    els.mapSearchSuggestions.hidden = true;
+    els.mapSearchInput.setAttribute("aria-expanded", "false");
+  }
+
+  function renderMapSearchSuggestions(suggestions) {
+    state.mapSearchSuggestions = suggestions;
+    if (!suggestions.length) {
+      els.mapSearchSuggestions.innerHTML = '<div class="address-loading">Nenhum endereço encontrado.</div>';
+      els.mapSearchSuggestions.hidden = false;
+      els.mapSearchInput.setAttribute("aria-expanded", "true");
+      return;
+    }
+    els.mapSearchSuggestions.innerHTML = suggestions.map((suggestion, index) => `
+      <button class="address-suggestion" type="button" role="option" data-map-suggestion-index="${index}">
+        <strong>${escapeHtml(suggestion.main || suggestion.label)}</strong>
+        ${suggestion.secondary ? `<span>${escapeHtml(suggestion.secondary)}</span>` : ""}
+      </button>`).join("");
+    els.mapSearchSuggestions.hidden = false;
+    els.mapSearchInput.setAttribute("aria-expanded", "true");
+    els.mapSearchSuggestions.querySelectorAll("[data-map-suggestion-index]").forEach((button) => {
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => selectMapSearchSuggestion(Number(button.dataset.mapSuggestionIndex)));
+    });
+  }
+
+  async function searchMapAddress(autoSelect = false) {
+    const input = els.mapSearchInput.value.trim();
+    if (input.length < 3) {
+      closeMapSearchSuggestions();
+      return;
+    }
+    const requestId = ++state.mapSearchRequestId;
+    els.mapSearchSuggestions.innerHTML = '<div class="address-loading">Procurando endereço...</div>';
+    els.mapSearchSuggestions.hidden = false;
+    els.mapSearchInput.setAttribute("aria-expanded", "true");
+    try {
+      const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(input)}`);
+      const suggestions = response.ok ? (await response.json()).suggestions || [] : [];
+      if (requestId !== state.mapSearchRequestId || els.mapSearchInput.value.trim() !== input) return;
+      renderMapSearchSuggestions(suggestions);
+      if (autoSelect && suggestions[0]) selectMapSearchSuggestion(0);
+    } catch {
+      if (requestId === state.mapSearchRequestId) renderMapSearchSuggestions([]);
+    }
+  }
+
+  function selectMapSearchSuggestion(index) {
+    const suggestion = state.mapSearchSuggestions[index];
+    if (!suggestion || !Number.isFinite(suggestion.lat) || !Number.isFinite(suggestion.lon)) return;
+    els.mapSearchInput.value = suggestion.label;
+    closeMapSearchSuggestions();
+    if (els.form.hidden) openForm();
+    els.address.value = suggestion.label;
+    selectPoint(suggestion.lat, suggestion.lon);
+    state.map.setView([suggestion.lat, suggestion.lon], 17, { animate: true });
+    els.mapInstruction.textContent = "Endereço encontrado — confirme o ponto e salve o cliente";
+  }
+
   function centerOnDevice() {
     if (!navigator.geolocation) { els.listStatus.textContent = "Localização indisponível neste navegador"; return; }
     els.centerLocation.disabled = true;
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      const latlng = [coords.latitude, coords.longitude];
-      state.map.setView(latlng, 15);
+    els.centerLocation.textContent = "Localizando...";
+    els.listStatus.textContent = "Buscando a localização mais precisa...";
+    let bestPosition = null;
+    let finished = false;
+    let watchId = null;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      els.centerLocation.disabled = false;
+      els.centerLocation.textContent = "Minha localização";
+      if (!bestPosition) {
+        els.listStatus.textContent = "Não foi possível acessar sua localização";
+        return;
+      }
+      const { latitude, longitude, accuracy } = bestPosition.coords;
+      const latlng = [latitude, longitude];
+      const zoom = accuracy <= 50 ? 18 : accuracy <= 150 ? 17 : 16;
+      state.map.setView(latlng, zoom);
       if (state.locationMarker) state.locationMarker.remove();
-      state.locationMarker = window.L.circleMarker(latlng, { radius: 8, color: "#fff", weight: 4, fillColor: "#1238d1", fillOpacity: 1 }).bindPopup("Sua localização").addTo(state.map);
-      els.centerLocation.disabled = false;
+      if (state.locationAccuracyCircle) state.locationAccuracyCircle.remove();
+      state.locationAccuracyCircle = window.L.circle(latlng, { radius: Math.max(accuracy, 8), color: "#1238d1", weight: 1, fillColor: "#1238d1", fillOpacity: 0.08 }).addTo(state.map);
+      state.locationMarker = window.L.circleMarker(latlng, { radius: 8, color: "#fff", weight: 4, fillColor: "#1238d1", fillOpacity: 1 })
+        .bindPopup(`Sua localização<br><small>Precisão aproximada: ${Math.round(accuracy)} m</small>`).addTo(state.map).openPopup();
+      els.listStatus.textContent = `Localização encontrada com precisão aproximada de ${Math.round(accuracy)} m`;
+    };
+    const timer = setTimeout(finish, 15000);
+    watchId = navigator.geolocation.watchPosition((position) => {
+      if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) bestPosition = position;
+      if (position.coords.accuracy <= 30) { clearTimeout(timer); finish(); }
     }, () => {
-      els.listStatus.textContent = "Não foi possível acessar sua localização";
-      els.centerLocation.disabled = false;
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+      clearTimeout(timer);
+      finish();
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
   async function initialize() {
@@ -394,9 +515,28 @@
     els.cancelForm.addEventListener("click", closeForm);
     els.form.addEventListener("submit", saveClient);
     els.centerLocation.addEventListener("click", centerOnDevice);
+    els.statusFilters.forEach((input) => input.addEventListener("change", () => {
+      state.statusFilter = input.value;
+      renderList();
+      renderMarkers();
+    }));
     els.category.addEventListener("change", () => {
       if (state.selectedPoint) selectPoint(state.selectedPoint.lat, state.selectedPoint.lon);
     });
+    els.statuses.forEach((input) => input.addEventListener("change", () => {
+      if (state.selectedPoint) selectPoint(state.selectedPoint.lat, state.selectedPoint.lon);
+    }));
+    els.mapSearchInput.addEventListener("input", () => {
+      clearTimeout(state.mapSearchTimer);
+      state.mapSearchTimer = setTimeout(() => void searchMapAddress(false), 350);
+    });
+    els.mapSearchInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      void searchMapAddress(true);
+    });
+    els.mapSearchInput.addEventListener("blur", () => setTimeout(closeMapSearchSuggestions, 150));
+    els.mapSearchButton.addEventListener("click", () => void searchMapAddress(true));
 
     showView(location.hash === "#clientes" ? "clients" : "search", false);
     try {

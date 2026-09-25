@@ -193,6 +193,12 @@
             <strong><span id="saved-client-count">0</span> clientes salvos</strong>
             <span>Clique em um marcador para ver os detalhes.</span>
           </div>
+          <fieldset class="client-status-filter" aria-label="Filtrar clientes por situação">
+            <legend>Mostrar</legend>
+            <label><input type="radio" name="client-status-filter" value="all" checked /><span>Todos</span></label>
+            <label><input type="radio" name="client-status-filter" value="ativo" /><span>Ativos</span></label>
+            <label><input type="radio" name="client-status-filter" value="espera" /><span>Em espera</span></label>
+          </fieldset>
           <div class="toolbar-actions">
             <button class="secondary-button compact" id="center-location-button" type="button">Minha localização</button>
             <button class="primary-button compact" id="new-client-button" type="button">+ Adicionar cliente</button>
@@ -201,6 +207,14 @@
 
         <div class="clients-grid">
           <div class="client-map-card">
+            <div class="client-map-search">
+              <label class="sr-only" for="client-map-address">Buscar endereço no mapa</label>
+              <div class="client-map-search-row">
+                <input id="client-map-address" type="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="client-map-suggestions" aria-expanded="false" placeholder="Buscar rua, bairro ou cidade" />
+                <button id="client-map-search-button" type="button">Buscar</button>
+              </div>
+              <div class="address-suggestions client-map-suggestions" id="client-map-suggestions" role="listbox" aria-label="Endereços encontrados" hidden></div>
+            </div>
             <div class="map-instruction" id="map-instruction">Mapa de Belo Horizonte</div>
             <div id="clients-map" role="region" aria-label="Mapa dos clientes salvos em Belo Horizonte"></div>
           </div>
@@ -221,6 +235,17 @@
                   <option value="outro">Outro</option>
                 </select>
               </label>
+              <fieldset class="client-status-choice">
+                <legend>Situação do cliente</legend>
+                <label class="status-option active-option">
+                  <input type="radio" name="client-status" value="ativo" checked />
+                  <span><strong>Ativo</strong><small>Cliente em atendimento</small></span>
+                </label>
+                <label class="status-option waiting-option">
+                  <input type="radio" name="client-status" value="espera" />
+                  <span><strong>Em espera</strong><small>Aguardando retorno</small></span>
+                </label>
+              </fieldset>
               <label>Endereço<input id="client-address" type="text" maxlength="240" placeholder="Rua, número e bairro" /></label>
               <div class="two-fields">
                 <label>Telefone<input id="client-phone" type="tel" maxlength="40" /></label>
@@ -242,7 +267,7 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="./app.js?v=7"></script>
-    <script src="./clients.js?v=1"></script>
+    <script src="./app.js?v=8"></script>
+    <script src="./clients.js?v=2"></script>
   </body>
 </html>
