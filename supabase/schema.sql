@@ -5,6 +5,7 @@ create table if not exists public.clients (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 120),
   category text not null check (category in ('padaria', 'supermercado', 'emporio', 'outro')),
+  client_status text not null default 'ativo' check (client_status in ('ativo', 'espera')),
   address text,
   phone text,
   contact_name text,
@@ -14,6 +15,10 @@ create table if not exists public.clients (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.clients
+  add column if not exists client_status text not null default 'ativo'
+  check (client_status in ('ativo', 'espera'));
 
 create index if not exists clients_user_id_created_at_idx
   on public.clients (user_id, created_at desc);
