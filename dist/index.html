@@ -18,13 +18,28 @@
         </span>
         <span>clientes <strong>aqui</strong></span>
       </a>
-      <nav class="topnav" aria-label="Navegação principal">
+      <nav class="topnav" aria-label="Navegação principal" hidden>
         <button class="nav-link is-active" type="button" data-view-target="search">Buscar</button>
         <button class="nav-link" type="button" data-view-target="clients">Clientes</button>
       </nav>
     </header>
 
-    <main class="page-shell" id="search-view" data-view="search">
+    <main class="login-shell" id="login-view" data-view="login">
+      <section class="auth-card" id="auth-card" aria-labelledby="login-title">
+        <div class="auth-copy">
+          <span class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12v10H6V10Zm6 4v2"/></svg></span>
+          <div><p class="eyebrow">CLIENTES AQUI</p><h1 id="login-title">Entre na sua conta</h1><p>Acesse a busca e o mapa dos seus clientes.</p></div>
+        </div>
+        <form id="auth-form" class="auth-form" novalidate>
+          <label>E-mail<input id="auth-email" type="email" autocomplete="email" placeholder="voce@empresa.com" required /></label>
+          <label>Senha<input id="auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="Sua senha" required /></label>
+          <div class="auth-actions"><button class="primary-button" id="signin-button" type="submit">Entrar</button><button class="secondary-button" id="signup-button" type="button">Criar conta</button></div>
+          <p class="inline-message" id="auth-message" role="status" hidden></p>
+        </form>
+      </section>
+    </main>
+
+    <main class="page-shell" id="search-view" data-view="search" hidden>
       <section class="search-panel" aria-labelledby="page-title">
         <div class="intro">
           <p class="eyebrow">PROSPECÇÃO LOCAL</p>
@@ -166,31 +181,10 @@
         </div>
       </section>
 
-      <section class="auth-card" id="auth-card">
-        <div class="auth-copy">
-          <span class="auth-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12v10H6V10Zm6 4v2"/></svg>
-          </span>
-          <div>
-            <h2>Entre para salvar seus clientes</h2>
-            <p>Use seu e-mail e senha. Seus pontos ficam disponíveis em qualquer dispositivo.</p>
-          </div>
-        </div>
-        <form id="auth-form" class="auth-form" novalidate>
-          <label>E-mail<input id="auth-email" type="email" autocomplete="email" placeholder="voce@empresa.com" required /></label>
-          <label>Senha<input id="auth-password" type="password" autocomplete="current-password" minlength="6" placeholder="Mínimo de 6 caracteres" required /></label>
-          <div class="auth-actions">
-            <button class="primary-button" id="signin-button" type="submit">Entrar</button>
-            <button class="secondary-button" id="signup-button" type="button">Criar conta</button>
-          </div>
-          <p class="inline-message" id="auth-message" role="status" hidden></p>
-        </form>
-      </section>
-
       <section class="clients-workspace" id="clients-workspace" hidden>
         <div class="clients-toolbar">
           <div>
-            <strong><span id="saved-client-count">0</span> clientes salvos</strong>
+            <strong class="saved-count"><span id="saved-client-count">0</span><span>clientes salvos</span></strong>
             <span>Clique em um marcador para ver os detalhes.</span>
           </div>
           <fieldset class="client-status-filter" aria-label="Filtrar clientes por situação">
@@ -198,6 +192,7 @@
             <label><input type="radio" name="client-status-filter" value="all" checked /><span>Todos</span></label>
             <label><input type="radio" name="client-status-filter" value="ativo" /><span>Ativos</span></label>
             <label><input type="radio" name="client-status-filter" value="espera" /><span>Em espera</span></label>
+            <label><input type="radio" name="client-status-filter" value="nao_visitado" /><span>A visitar</span></label>
           </fieldset>
           <div class="toolbar-actions">
             <button class="secondary-button compact" id="center-location-button" type="button">Minha localização</button>
@@ -243,7 +238,11 @@
                 </label>
                 <label class="status-option waiting-option">
                   <input type="radio" name="client-status" value="espera" />
-                  <span><strong>Em espera</strong><small>Aguardando retorno</small></span>
+                  <span><strong>Em espera</strong><small>Já visitado; aguardando retorno</small></span>
+                </label>
+                <label class="status-option prospect-option">
+                  <input type="radio" name="client-status" value="nao_visitado" checked />
+                  <span><strong>A visitar</strong><small>Ainda não visitado</small></span>
                 </label>
               </fieldset>
               <label>Endereço<input id="client-address" type="text" maxlength="240" placeholder="Rua, número e bairro" /></label>
@@ -267,7 +266,7 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="./app.js?v=8"></script>
-    <script src="./clients.js?v=2"></script>
+    <script src="./app.js?v=9"></script>
+    <script src="./clients.js?v=3"></script>
   </body>
 </html>

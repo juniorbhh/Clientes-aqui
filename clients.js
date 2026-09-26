@@ -1,6 +1,7 @@
 (() => {
   const BH_CENTER = { lat: -19.9167, lon: -43.9345 };
   const STORAGE_KEY = "clientes-aqui-supabase-session";
+  const UNVISITED_MARKER = "[[CLIENTES_AQUI_A_VISITAR]]\n";
   const categoryLabels = {
     padaria: "Padaria",
     supermercado: "Supermercado",
@@ -28,6 +29,8 @@
 
   const els = {
     navButtons: [...document.querySelectorAll("[data-view-target]")],
+    nav: document.querySelector(".topnav"),
+    loginView: document.querySelector("#login-view"),
     views: [...document.querySelectorAll("[data-view]")],
     authCard: document.querySelector("#auth-card"),
     authForm: document.querySelector("#auth-form"),
@@ -66,7 +69,8 @@
     mapSearchSuggestions: document.querySelector("#client-map-suggestions"),
   };
 
-  const statusLabels = { ativo: "Ativo", espera: "Em espera" };
+  const statusLabels = { ativo: "Ativo", espera: "Em espera", nao_visitado: "A visitar" };
+  const statusOrder = ["nao_visitado", "espera", "ativo"];
 
   function escapeHtml(value = "") {
     return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
@@ -91,6 +95,7 @@
     state.session = session || null;
     if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     else localStorage.removeItem(STORAGE_KEY);
+    window.clientesAquiAccessToken = session?.access_token || null;
   }
 
   function readSession() {
@@ -142,8 +147,10 @@
   }
 
   function showView(name, updateHash = true) {
+    if (!state.session?.access_token || !state.session?.user) name = "login";
     els.views.forEach((view) => { view.hidden = view.dataset.view !== name; });
     els.navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.viewTarget === name));
+    els.nav.hidden = name === "login";
     if (updateHash) history.replaceState(null, "", name === "clients" ? "#clientes" : location.pathname + location.search);
     if (name === "clients" && state.map) setTimeout(() => state.map.invalidateSize(), 0);
   }
@@ -155,9 +162,10 @@
     els.account.hidden = !signedIn;
     els.accountEmail.textContent = signedIn ? state.session.user.email || "Conta conectada" : "";
     if (signedIn) {
+      showView(location.hash === "#clientes" ? "clients" : "search", false);
       initializeMap();
       void loadClients();
-    }
+    } else showView("login");
   }
 
   function initializeMap() {
@@ -172,6 +180,7 @@
     state.map.on("click", (event) => {
       if (els.form.hidden) return;
       selectPoint(event.latlng.lat, event.latlng.lng, true);
+      showClientFormOnMobile();
     });
   }
 
@@ -211,7 +220,7 @@
       els.list.innerHTML = `<div class="clients-empty"><strong>${state.clients.length ? "Filtro sem resultados" : "Seu mapa está pronto"}</strong><p>${emptyMessage}</p></div>`;
       return;
     }
-    els.list.innerHTML = clients.map((client) => {
+    const renderCard = (client) => {
       const clientStatus = client.client_status || "ativo";
       return `
       <article class="saved-client-card status-${escapeHtml(clientStatus)}" data-client-id="${escapeHtml(client.id)}">
@@ -224,6 +233,11 @@
           <button class="danger-link" type="button" data-delete-client="${escapeHtml(client.id)}">Excluir</button>
         </div>
       </article>`;
+    };
+    els.list.innerHTML = statusOrder.map((status) => {
+      const group = clients.filter((client) => (client.client_status || "ativo") === status);
+      if (!group.length) return "";
+      return `<section class="client-group status-${status}" aria-label="${statusLabels[status]}"><h3>${statusLabels[status]} <span>${group.length}</span></h3>${group.map(renderCard).join("")}</section>`;
     }).join("");
     els.list.querySelectorAll("[data-focus-client]").forEach((button) => button.addEventListener("click", () => focusClient(button.dataset.focusClient)));
     els.list.querySelectorAll("[data-edit-client]").forEach((button) => button.addEventListener("click", () => editClient(button.dataset.editClient)));
@@ -247,7 +261,12 @@
     els.listStatus.textContent = "Carregando...";
     try {
       const data = await api("/rest/v1/clients?select=*&order=created_at.desc", { accessToken: state.session.access_token });
-      state.clients = Array.isArray(data) ? data.map((client) => ({ ...client, client_status: client.client_status || "ativo" })) : [];
+      state.clients = Array.isArray(data) ? data.map((client) => ({
+        ...client,
+        client_status: client.client_status === "espera" && client.notes?.startsWith(UNVISITED_MARKER)
+          ? "nao_visitado" : client.client_status || "ativo",
+        notes: client.notes?.startsWith(UNVISITED_MARKER) ? client.notes.slice(UNVISITED_MARKER.length) : client.notes,
+      })) : [];
       renderList();
       renderMarkers();
     } catch (error) {
@@ -269,13 +288,24 @@
     if (moveMap) state.map.panTo([lat, lon]);
   }
 
+  function showClientFormOnMobile() {
+    if (window.matchMedia("(max-width: 620px)").matches && !els.form.hidden && state.selectedPoint) {
+      document.body.classList.add("client-form-modal-open");
+      els.form.classList.add("is-modal-visible");
+      els.form.setAttribute("role", "dialog");
+      els.form.setAttribute("aria-modal", "true");
+      els.form.setAttribute("aria-label", els.formTitle.textContent);
+      setTimeout(() => els.name.focus(), 0);
+    }
+  }
+
   function openForm(client = null) {
     state.editingId = client?.id || null;
     els.form.hidden = false;
     els.formTitle.textContent = client ? "Editar cliente" : "Adicionar cliente";
     els.name.value = client?.name || "";
     els.category.value = client?.category || "padaria";
-    const clientStatus = client?.client_status || "ativo";
+    const clientStatus = client?.client_status || "nao_visitado";
     els.statuses.forEach((input) => { input.checked = input.value === clientStatus; });
     els.address.value = client?.address || "";
     els.phone.value = client?.phone || "";
@@ -284,17 +314,22 @@
     setMessage(els.formMessage);
     els.mapInstruction.textContent = "Clique no mapa para marcar o ponto do cliente";
     els.mapInstruction.classList.add("is-placing");
-    if (client) selectPoint(client.latitude, client.longitude, true);
+    if (client) { selectPoint(client.latitude, client.longitude, true); showClientFormOnMobile(); }
     else {
       state.selectedPoint = null;
       els.selectedPoint.textContent = "Nenhum ponto marcado";
       els.selectedPoint.classList.remove("is-selected");
       if (state.draftMarker) { state.draftMarker.remove(); state.draftMarker = null; }
     }
-    setTimeout(() => els.name.focus(), 0);
+    if (!window.matchMedia("(max-width: 620px)").matches) setTimeout(() => els.name.focus(), 0);
   }
 
   function closeForm() {
+    document.body.classList.remove("client-form-modal-open");
+    els.form.classList.remove("is-modal-visible");
+    els.form.removeAttribute("role");
+    els.form.removeAttribute("aria-modal");
+    els.form.removeAttribute("aria-label");
     els.form.hidden = true;
     state.editingId = null;
     state.selectedPoint = null;
@@ -331,12 +366,15 @@
     setMessage(els.formMessage);
     try {
       const path = state.editingId ? `/rest/v1/clients?id=eq.${encodeURIComponent(state.editingId)}` : "/rest/v1/clients";
-      await api(path, {
-        method: state.editingId ? "PATCH" : "POST",
-        body: payload,
-        accessToken: state.session.access_token,
-        headers: { Prefer: "return=representation" },
+      const save = (data) => api(path, {
+        method: state.editingId ? "PATCH" : "POST", body: data,
+        accessToken: state.session.access_token, headers: { Prefer: "return=representation" },
       });
+      try { await save(payload); }
+      catch (error) {
+        if (payload.client_status !== "nao_visitado" || !/23514|client_status|check constraint/i.test(`${error.code || ""} ${error.message}`)) throw error;
+        await save({ ...payload, client_status: "espera", notes: UNVISITED_MARKER + (payload.notes || "") });
+      }
       closeForm();
       await loadClients();
     } catch (error) {
@@ -462,7 +500,8 @@
     if (els.form.hidden) openForm();
     els.address.value = suggestion.label;
     selectPoint(suggestion.lat, suggestion.lon);
-    state.map.setView([suggestion.lat, suggestion.lon], 17, { animate: true });
+      state.map.setView([suggestion.lat, suggestion.lon], 17, { animate: true });
+      showClientFormOnMobile();
     els.mapInstruction.textContent = "Endereço encontrado — confirme o ponto e salve o cliente";
   }
 
@@ -513,6 +552,7 @@
     els.signout.addEventListener("click", () => void signOut());
     els.newClient.addEventListener("click", () => openForm());
     els.cancelForm.addEventListener("click", closeForm);
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && document.body.classList.contains("client-form-modal-open")) closeForm(); });
     els.form.addEventListener("submit", saveClient);
     els.centerLocation.addEventListener("click", centerOnDevice);
     els.statusFilters.forEach((input) => input.addEventListener("change", () => {
@@ -538,14 +578,19 @@
     els.mapSearchInput.addEventListener("blur", () => setTimeout(closeMapSearchSuggestions, 150));
     els.mapSearchButton.addEventListener("click", () => void searchMapAddress(true));
 
-    showView(location.hash === "#clientes" ? "clients" : "search", false);
+    showView("login", false);
     try {
       const response = await fetch("/api/config", { cache: "no-store" });
       const config = response.ok ? await response.json() : {};
       if (!config.supabaseUrl || !config.supabasePublishableKey) throw new Error("A integração do Supabase ainda não forneceu as variáveis públicas ao site.");
       state.config = { supabaseUrl: config.supabaseUrl.replace(/\/$/, ""), supabasePublishableKey: config.supabasePublishableKey };
       saveSession(readSession());
-      if (state.session && !(await validSession())) saveSession(null);
+      if (state.session && await validSession()) {
+        try {
+          const user = await api("/auth/v1/user", { accessToken: state.session.access_token });
+          if (!user?.id || user.id !== state.session.user?.id) saveSession(null);
+        } catch { saveSession(null); }
+      } else saveSession(null);
       renderAuthState();
     } catch (error) {
       setMessage(els.authMessage, error.message, "error");

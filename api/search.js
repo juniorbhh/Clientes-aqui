@@ -1,4 +1,5 @@
 const VALID_CATEGORIES = new Set(["padaria", "supermercado", "emporio"]);
+const requireUser = require("./_auth");
 const VALID_RADII_KM = new Set([1, 5, 10]);
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
@@ -242,6 +243,7 @@ module.exports = async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Use o botão de busca para consultar os clientes." });
   }
+  if (!(await requireUser(req, res))) return;
 
   try {
     const body = parseBody(req);

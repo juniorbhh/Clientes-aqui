@@ -120,7 +120,7 @@ function renderSuggestions(suggestions) {
 }
 
 async function fetchFallbackSuggestions(input) {
-  try { const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(input)}`); if (!response.ok) return []; return (await response.json()).suggestions || []; } catch { return []; }
+  try { const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(input)}`, { headers: { Authorization: `Bearer ${window.clientesAquiAccessToken || ""}` } }); if (!response.ok) return []; return (await response.json()).suggestions || []; } catch { return []; }
 }
 
 async function fetchGoogleSuggestions(input) {
@@ -165,7 +165,7 @@ async function selectSuggestion(index) {
 async function requestSearch(payload) {
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 50000); let response;
   try {
-    response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
+    response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${window.clientesAquiAccessToken || ""}` }, body: JSON.stringify(payload), signal: controller.signal });
   } catch (cause) {
     const error = new Error("A fonte de estabelecimentos ainda não respondeu."); error.retryable = true; error.cause = cause; throw error;
   } finally { clearTimeout(timer); }
@@ -319,6 +319,7 @@ async function executeSearch(typedAddress, selected, radiusKm) {
 }
 
 async function runSearch({ address, categories, radiusKm } = {}) {
+  if (!window.clientesAquiAccessToken) return { ok: false, message: "Entre na sua conta para pesquisar." };
   if (state.searching) return { ok: false, message: "Já existe uma busca em andamento." };
   const selected = categories?.length ? categories : getSelectedCategories(); const selectedRadius = Number(radiusKm || getRadiusKm());
   if (!selected.length) { setError("Escolha pelo menos uma categoria de cliente."); return { ok: false, message: "Nenhuma categoria selecionada." }; }

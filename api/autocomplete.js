@@ -1,4 +1,5 @@
 const AUTOCOMPLETE_TIMEOUT_MS = 6500;
+const requireUser = require("./_auth");
 
 const osmHeaders = {
   "User-Agent": "ClientesAqui/1.2 (https://clientes-aqui-cliente-aqui.vercel.app)",
@@ -37,8 +38,9 @@ function suggestionFromPlace(place) {
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=120");
+  res.setHeader("Cache-Control", "private, no-store");
   if (req.method !== "GET") return res.status(405).json({ suggestions: [] });
+  if (!(await requireUser(req, res))) return;
   const input = String(req.query?.q || "").trim();
   if (input.length < 3 || input.length > 160) return res.status(200).json({ suggestions: [] });
 

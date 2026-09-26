@@ -5,7 +5,7 @@ create table if not exists public.clients (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 120),
   category text not null check (category in ('padaria', 'supermercado', 'emporio', 'outro')),
-  client_status text not null default 'ativo' check (client_status in ('ativo', 'espera')),
+  client_status text not null default 'nao_visitado' check (client_status in ('ativo', 'espera', 'nao_visitado')),
   address text,
   phone text,
   contact_name text,
@@ -16,9 +16,27 @@ create table if not exists public.clients (
   updated_at timestamptz not null default now()
 );
 
-alter table public.clients
-  add column if not exists client_status text not null default 'ativo'
-  check (client_status in ('ativo', 'espera'));
+alter table public.clients add column if not exists client_status text;
+alter table public.clients alter column client_status set default 'nao_visitado';
+update public.clients set client_status = 'ativo' where client_status is null;
+alter table public.clients alter column client_status set not null;
+do $$
+declare constraint_name text;
+begin
+  for constraint_name in
+    select conname from pg_constraint
+    where conrelid = 'public.clients'::regclass and contype = 'c'
+      and pg_get_constraintdef(oid) like '%client_status%'
+  loop
+    execute format('alter table public.clients drop constraint %I', constraint_name);
+  end loop;
+end $$;
+alter table public.clients add constraint clients_client_status_check
+  check (client_status in ('ativo', 'espera', 'nao_visitado'));
+update public.clients
+set client_status = 'nao_visitado',
+    notes = nullif(substr(notes, length('[[CLIENTES_AQUI_A_VISITAR]]' || chr(10)) + 1), '')
+where client_status = 'espera' and notes like '[[CLIENTES_AQUI_A_VISITAR]]' || chr(10) || '%';
 
 create index if not exists clients_user_id_created_at_idx
   on public.clients (user_id, created_at desc);
