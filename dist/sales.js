@@ -79,7 +79,7 @@
       const followups = app.getClients().map(c => ({...c, summary: stats(c.id)})).filter(c => c.summary.days !== null && c.summary.days >= 15).sort((a,b) => b.summary.days-a.summary.days);
       $('dashboard-followups').innerHTML = followups.slice(0,8).map(c => `<button class="dashboard-row" type="button" data-business-profile="${c.id}"><span><strong>${esc(c.name)}</strong><small>Última entrega: ${C.dateLabel(c.summary.last.delivered_on)}</small></span><b>${c.summary.days} dias</b></button>`).join('') || empty('Nenhum cliente com compra registrada há 15 dias ou mais.');
       const products = new Map();
-      monthSales.flatMap(s => s.items).forEach(i => { const key = `${i.product.toLocaleLowerCase('pt-BR')}|${i.unit}`; const prev = products.get(key) || {...i, quantity:0, amount:0}; prev.quantity += Number(i.quantity); prev.amount += C.lineTotal(i.quantity,i.unit_price_cents); products.set(key,prev); });
+      monthSales.flatMap(s => s.items).forEach(i => { const key = `${i.product.toLocaleLowerCase('pt-BR')}|${i.unit}`; const prev = products.get(key) || {...i, quantity:0, amount:0}; prev.quantity += Number(i.quantity); prev.amount += C.itemTotal(i); products.set(key,prev); });
       const top = [...products.values()].sort((a,b) => b.amount-a.amount).slice(0,6);
       $('dashboard-products').innerHTML = top.map(i => `<div class="product-rank"><div><strong>${esc(i.product)}</strong><span>${Number(i.quantity).toLocaleString('pt-BR')} ${units[i.unit]}</span></div><small class="product-rank-value">${money(i.amount)}</small><div class="rank-track"><span style="width:${Math.max(3,Math.round(i.amount/Math.max(1,top[0].amount)*100))}%"></span></div></div>`).join('') || empty('Os produtos aparecerão conforme as vendas forem registradas.');
     }
@@ -102,26 +102,34 @@
   }
   function saleHistory(s) {
     const balance = Number(s.total_cents)-Number(s.paid_cents);
-    return `<details class="history-sale"><summary><span><strong>Entrega · ${C.dateLabel(s.delivered_on)}</strong><small>${balance ? `Pendente: ${money(balance)}` : 'Pagamento completo'}</small></span><b>${money(s.total_cents)}</b></summary><div class="history-sale-body"><ul>${s.items.map(i => `<li><span>${esc(itemText(i))}<small>${money(i.unit_price_cents)} por ${i.unit === 'un' ? 'unidade' : i.unit}</small></span><b>${money(C.lineTotal(i.quantity,i.unit_price_cents))}</b></li>`).join('')}</ul>${Number(s.discount_cents) ? `<p>Desconto: ${money(s.discount_cents)}</p>` : ''}<p>Forma informada: ${esc(s.payment_method || s.payments[0]?.method || "Outro")}</p><p>Pago: <strong>${money(s.paid_cents)}</strong></p>${balance ? `<p class="balance-pending">Saldo: ${money(balance)} · Vencimento: ${C.dateLabel(s.due_on)}</p><button class="secondary-button full" type="button" data-business-payment="${s.id}">Registrar pagamento</button>` : ''}${s.notes ? `<p class="preserve-lines">${esc(s.notes)}</p>` : ''}<h4>Recebimentos</h4>${s.payments.length ? s.payments.map(p => `<p class="payment-entry">${C.dateLabel(p.paid_on)} · ${esc(p.method)} <strong>${money(p.amount_cents)}</strong></p>`).join('') : '<p>Nenhum recebimento registrado.</p>'}</div></details>`;
+    return `<details class="history-sale"><summary><span><strong>Entrega · ${C.dateLabel(s.delivered_on)}</strong><small>${balance ? `Pendente: ${money(balance)}` : 'Pagamento completo'}</small></span><b>${money(s.total_cents)}</b></summary><div class="history-sale-body"><ul>${s.items.map(i => `<li><span>${esc(itemText(i))}<small>${i.line_total_cents !== undefined ? 'Preço total' : `${money(i.unit_price_cents)} por ${i.unit === 'un' ? 'unidade' : i.unit}`}</small></span><b>${money(C.itemTotal(i))}</b></li>`).join('')}</ul>${Number(s.discount_cents) ? `<p>Desconto: ${money(s.discount_cents)}</p>` : ''}<p>Forma informada: ${esc(s.payment_method || s.payments[0]?.method || "Outro")}</p><p>Pago: <strong>${money(s.paid_cents)}</strong></p>${balance ? `<p class="balance-pending">Saldo: ${money(balance)} · Vencimento: ${C.dateLabel(s.due_on)}</p><button class="secondary-button full" type="button" data-business-payment="${s.id}">Registrar pagamento</button>` : ''}${s.notes ? `<p class="preserve-lines">${esc(s.notes)}</p>` : ''}<h4>Recebimentos</h4>${s.payments.length ? s.payments.map(p => `<p class="payment-entry">${C.dateLabel(p.paid_on)} · ${esc(p.method)} <strong>${money(p.amount_cents)}</strong></p>`).join('') : '<p>Nenhum recebimento registrado.</p>'}</div></details>`;
   }
   function addItem() {
     if ($('sale-items').children.length >= 100) return;
     const row = document.createElement('div'); row.className = 'sale-item';
-    row.innerHTML = `<div class="sale-item-header"><strong>Produto</strong><button type="button" class="remove-item" aria-label="Remover produto">Remover</button></div><label class="sr-only">Nome do produto</label><input aria-label="Nome do produto" data-product list="sale-products" maxlength="120" placeholder="Escolha ou digite o produto" required /><div class="item-fields"><label>Medida<select data-unit><option value="pacote">Pacote</option><option value="fardo">Fardo</option><option value="kg">Quilo</option><option value="un">Unidade</option></select></label><label>Quantidade<input data-quantity type="text" inputmode="decimal" value="1" required /></label><label>Preço por medida (R$)<input data-price type="text" inputmode="decimal" placeholder="0,00" required /></label></div><p class="item-line-total">Subtotal: <strong>R$ 0,00</strong></p>`;
+    row.innerHTML = `<div class="sale-item-header"><strong>Produto</strong><button type="button" class="remove-item" aria-label="Remover produto">Remover</button></div><label class="sr-only">Nome do produto</label><input aria-label="Nome do produto" data-product list="sale-products" maxlength="120" placeholder="Escolha ou digite o produto" required /><div class="item-fields"><label>Medida<select data-unit><option value="fardo">Fardo</option><option value="kg">Quilo</option><option value="un">Unidade</option></select></label><label>Quantidade<input data-quantity type="text" inputmode="decimal" value="1" required /></label><label>Preço total (R$)<input data-price type="text" inputmode="decimal" placeholder="0,00" required /></label></div><p class="item-line-total">Subtotal: <strong>R$ 0,00</strong></p>`;
     row.querySelector('.remove-item').addEventListener('click', () => { if ($('sale-items').children.length > 1) { row.remove(); updateTotals(); } else toast('A venda precisa de pelo menos um produto.'); });
     $('sale-items').append(row); updateTotals();
   }
   function readItems() {
-    return [...$('sale-items').children].map(row => ({product:row.querySelector('[data-product]').value.trim(),unit:row.querySelector('[data-unit]').value,quantity:C.number(row.querySelector('[data-quantity]').value),unit_price_cents:C.cents(row.querySelector('[data-price]').value)}));
+    return [...$('sale-items').children].map(row => ({product:row.querySelector('[data-product]').value.trim(),unit:row.querySelector('[data-unit]').value,quantity:C.number(row.querySelector('[data-quantity]').value),line_total_cents:C.cents(row.querySelector('[data-price]').value)}));
   }
   function updateTotals() {
     const items = readItems();
-    [...$('sale-items').children].forEach((row,i) => { const value = C.lineTotal(items[i].quantity,items[i].unit_price_cents); row.querySelector('.item-line-total strong').textContent = money(Number.isFinite(value) ? Math.round(value) : 0); });
-    const subtotal = items.reduce((s,i) => s+(Number.isFinite(C.lineTotal(i.quantity,i.unit_price_cents)) ? C.lineTotal(i.quantity,i.unit_price_cents) : 0),0);
+    [...$('sale-items').children].forEach((row,i) => { const value = C.itemTotal(items[i]); row.querySelector('.item-line-total strong').textContent = money(Number.isFinite(value) ? Math.round(value) : 0); });
+    const subtotal = items.reduce((s,i) => s+(Number.isFinite(C.itemTotal(i)) ? C.itemTotal(i) : 0),0);
     const total = Math.max(0, subtotal-(C.cents($('sale-discount').value)||0));
-    const paid = C.cents($('sale-paid').value)||0;
+    const vale = $('sale-method').value === 'Vale';
+    const partial = $('sale-partial').checked;
+    $('sale-partial').disabled = vale;
+    $('sale-partial-label').hidden = vale;
+    $('sale-paid-label').hidden = vale || !partial;
+    $('sale-vale-note').hidden = !vale;
+    const paid = C.salePayment(total, $('sale-method').value, partial, $('sale-paid').value);
     $('sale-total').innerHTML = `<small>Total da venda</small><strong>${money(total)}</strong><span>Saldo a receber: ${money(Math.max(0,total-paid))}</span>`;
-    $('sale-due-label').hidden = total > 0 && paid >= total;
+    $('sale-due-label').hidden = !vale && !partial;
+    $('sale-due').required = vale || partial;
+    $('sale-due').min = $('sale-date').value;
     return total;
   }
   function openSale(id) {
@@ -153,7 +161,10 @@
     let t, items;
     try {
       if (!isValidDate($('sale-date').value)) throw new Error('Informe uma data de entrega válida, até hoje.');
-      items=readItems(); t=C.totals(items,C.cents($('sale-discount').value || '0'),C.cents($('sale-paid').value || '0'));
+      items=readItems(); const discount=C.cents($('sale-discount').value || '0');
+      const total=C.totals(items,discount,0).total;
+      t=C.totals(items,discount,C.salePayment(total,$('sale-method').value,$('sale-partial').checked,$('sale-paid').value));
+      if ($('sale-method').value !== 'Vale' && $('sale-partial').checked && !t.balance) throw new Error('O valor recebido deve ser menor que o total. Para pagamento completo, desmarque a opção.');
       if (t.balance && (!$('sale-due').value || $('sale-due').value < $('sale-date').value)) throw new Error('Informe o vencimento do saldo, a partir da data de entrega.');
     } catch (error) { message('sale-error',error.message); return; }
     void persist('sale-save','sale-error',()=>app.request('/rest/v1/rpc/register_sale',{method:'POST',body:{p_id:S.saleId,p_client_id:S.clientId,p_delivered_on:$('sale-date').value,p_items:items,p_discount_cents:C.cents($('sale-discount').value || '0'),p_paid_cents:t.paid,p_payment_method:$('sale-method').value,p_due_on:t.balance ? $('sale-due').value : null,p_notes:$('sale-notes').value.trim()}}),'sale-dialog','Venda e entrega registradas.');
@@ -170,7 +181,7 @@
   });
   $('sale-add-item').addEventListener('click', addItem);
   $('sale-form').addEventListener('input', updateTotals);
-  $('sale-paid-full').addEventListener('click', () => { $('sale-paid').value=amountInput(updateTotals()); updateTotals(); });
+  $('sale-form').addEventListener('change', updateTotals);
   $('dashboard-month').value=C.today().slice(0,7);
   $('dashboard-month').addEventListener('change',render);
   $('sales-retry').addEventListener('click',()=>void load());

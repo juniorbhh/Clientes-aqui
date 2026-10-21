@@ -154,3 +154,8 @@ body:has(.business-dialog[open]) { overflow: hidden; }
   .profile-actions button { padding-inline: 8px; min-height: 48px; font-size: .82rem; }
   .business-toast { bottom: max(12px,env(safe-area-inset-bottom)); font-size: .8rem; }
 }
+
+.sale-partial-option { display:flex !important; flex-direction:row !important; align-items:center; gap:10px; min-height:48px; cursor:pointer; }
+.sale-partial-option input { width:22px; height:22px; flex:0 0 22px; accent-color:var(--primary, #173bdb); }
+
+.sale-partial-option[hidden] { display:none !important; }

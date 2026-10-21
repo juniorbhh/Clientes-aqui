@@ -19,3 +19,19 @@ test('dashboard counts receipts by payment date and outstanding across periods',
  assert.equal(stats.days,2);assert.equal(stats.lastVisit,'2026-10-21');assert.equal(stats.balance,4000);
  assert.equal(C.clientStats('new',sales,[],'2026-10-22').last,null);
 });
+test('new line prices are totals while old unit prices keep historical amounts',()=>{
+ const items=[{product:'Pimentinha',unit:'fardo',quantity:2,line_total_cents:6600},{product:'Palha',unit:'kg',quantity:0.29,unit_price_cents:150}];
+ assert.equal(C.itemTotal(items[0]),6600);
+ assert.equal(C.itemTotal(items[1]),44);
+ assert.deepEqual(C.totals(items,44,0),{subtotal:6644,total:6600,paid:0,balance:6600});
+ assert.throws(()=>C.totals([{...items[0],line_total_cents:NaN}]));
+ assert.throws(()=>C.totals([{...items[0],quantity:0}]));
+});
+test('full payment defaults to total, partial uses received, Vale always records zero',()=>{
+ assert.equal(C.salePayment(6600,'Pix',false,'10'),6600);
+ assert.equal(C.salePayment(6600,'Pix',true,'10'),1000);
+ assert.equal(C.salePayment(6600,'Pix',true,''),0);
+ assert.equal(C.salePayment(6600,'Vale',false,'66'),0);
+ assert.equal(C.salePayment(6600,'Vale',true,'66'),0);
+ assert.ok(Number.isNaN(C.salePayment(6600,'Pix',true,'errado')));
+});

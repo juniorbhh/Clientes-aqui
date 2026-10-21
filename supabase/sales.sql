@@ -8,7 +8,7 @@ create table if not exists public.sales (
   discount_cents bigint not null default 0 check (discount_cents >= 0),
   total_cents bigint not null check (total_cents > 0),
   paid_cents bigint not null default 0 check (paid_cents >= 0 and paid_cents <= total_cents),
-  payment_method text not null check (payment_method in ('Pix','Dinheiro','Cartão','Boleto','Outro')),
+  payment_method text not null check (payment_method in ('Pix','Dinheiro','Cartão','Boleto','Outro','Vale')),
   due_on date,
   notes text check (char_length(notes) <= 1000),
   payments jsonb not null default '[]'::jsonb check (jsonb_typeof(payments) = 'array'),
@@ -17,6 +17,8 @@ create table if not exists public.sales (
 alter table public.sales add column if not exists payment_method text;
 update public.sales set payment_method = coalesce(payments->0->>'method','Outro') where payment_method is null;
 alter table public.sales alter column payment_method set not null;
+alter table public.sales drop constraint if exists sales_payment_method_check;
+alter table public.sales add constraint sales_payment_method_check check (payment_method in ('Pix','Dinheiro','Cartão','Boleto','Outro','Vale'));
 create index if not exists sales_user_delivery_idx on public.sales(user_id, delivered_on desc);
 create index if not exists sales_client_idx on public.sales(client_id);
 alter table public.sales enable row level security;
@@ -51,7 +53,7 @@ create or replace function public.register_sale(
  p_paid_cents bigint, p_payment_method text, p_due_on date, p_notes text,
  p_id uuid
 ) returns public.sales language plpgsql security definer set search_path = '' as $$
-declare item jsonb; subtotal bigint := 0; total bigint; result public.sales; uid uuid := auth.uid();
+declare item jsonb; item_price numeric; item_amount numeric; subtotal bigint := 0; total bigint; result public.sales; uid uuid := auth.uid();
 begin
  if uid is null or not exists(select 1 from public.clients where id=p_client_id and user_id=uid) then raise exception 'Cliente não encontrado nesta conta.'; end if;
  -- Client-generated UUID makes retried submissions idempotent.
@@ -64,16 +66,23 @@ begin
      or coalesce(item->>'unit','') not in ('pacote','fardo','kg','un')
      or coalesce((item->>'quantity')::numeric,0) <= 0 or (item->>'quantity')::numeric > 1000000
      or round((item->>'quantity')::numeric,3) <> (item->>'quantity')::numeric
-     or coalesce((item->>'unit_price_cents')::numeric,-1) < 0
-     or (item->>'unit_price_cents')::numeric > 1000000000
-     or trunc((item->>'unit_price_cents')::numeric) <> (item->>'unit_price_cents')::numeric then raise exception 'Produto, quantidade ou preço inválido.'; end if;
-   subtotal := subtotal + round((item->>'quantity')::numeric * (item->>'unit_price_cents')::numeric)::bigint;
+     then raise exception 'Produto ou quantidade inválida.'; end if;
+   if item ? 'line_total_cents' then
+     item_price := coalesce((item->>'line_total_cents')::numeric,-1);
+     item_amount := item_price;
+   else
+     item_price := coalesce((item->>'unit_price_cents')::numeric,-1);
+     item_amount := round((item->>'quantity')::numeric * item_price);
+   end if;
+   if item_price < 0 or item_price > 1000000000 or trunc(item_price) <> item_price or item_price = 'NaN'::numeric then raise exception 'Preço inválido.'; end if;
+   subtotal := subtotal + item_amount::bigint;
  end loop;
  if subtotal > 9007199254740991 then raise exception 'Valor da venda muito alto.'; end if;
  if p_discount_cents is null or p_discount_cents < 0 or p_discount_cents >= subtotal then raise exception 'Desconto inválido.'; end if;
  total := subtotal-p_discount_cents;
  if p_paid_cents is null or p_paid_cents < 0 or p_paid_cents > total then raise exception 'Valor pago inválido.'; end if;
- if coalesce(p_payment_method,'') not in ('Pix','Dinheiro','Cartão','Boleto','Outro') then raise exception 'Selecione a forma de pagamento.'; end if;
+ if coalesce(p_payment_method,'') not in ('Pix','Dinheiro','Cartão','Boleto','Outro','Vale') then raise exception 'Selecione a forma de pagamento.'; end if;
+ if p_payment_method = 'Vale' and p_paid_cents <> 0 then raise exception 'Vale deve ter valor recebido igual a zero.'; end if;
  if p_paid_cents < total and (p_due_on is null or p_due_on < p_delivered_on) then raise exception 'Informe o vencimento do saldo pendente.'; end if;
  insert into public.sales(id,user_id,client_id,delivered_on,items,discount_cents,total_cents,paid_cents,payment_method,due_on,notes,payments)
  values(p_id,uid,p_client_id,p_delivered_on,p_items,p_discount_cents,total,p_paid_cents,p_payment_method,
