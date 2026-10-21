@@ -59,11 +59,13 @@ begin
    if nullif(trim(item->>'product'),'') is null or char_length(item->>'product') > 120
      or coalesce(item->>'unit','') not in ('pacote','fardo','kg','un')
      or coalesce((item->>'quantity')::numeric,0) <= 0 or (item->>'quantity')::numeric > 1000000
+     or round((item->>'quantity')::numeric,3) <> (item->>'quantity')::numeric
      or coalesce((item->>'unit_price_cents')::numeric,-1) < 0
      or (item->>'unit_price_cents')::numeric > 1000000000
      or trunc((item->>'unit_price_cents')::numeric) <> (item->>'unit_price_cents')::numeric then raise exception 'Produto, quantidade ou preço inválido.'; end if;
    subtotal := subtotal + round((item->>'quantity')::numeric * (item->>'unit_price_cents')::numeric)::bigint;
  end loop;
+ if subtotal > 9007199254740991 then raise exception 'Valor da venda muito alto.'; end if;
  if p_discount_cents is null or p_discount_cents < 0 or p_discount_cents >= subtotal then raise exception 'Desconto inválido.'; end if;
  total := subtotal-p_discount_cents;
  if p_paid_cents is null or p_paid_cents < 0 or p_paid_cents > total then raise exception 'Valor pago inválido.'; end if;

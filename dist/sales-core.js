@@ -15,9 +15,15 @@
     const parsed = number(value);
     return Number.isFinite(parsed) && parsed >= 0 && parsed <= 10000000 ? Math.round((parsed + Number.EPSILON) * 100) : NaN;
   }
+  function lineTotal(quantity, price) {
+    const thousandths = Math.round(quantity * 1000);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000 || Math.abs(quantity * 1000 - thousandths) > 0.000001 || !Number.isSafeInteger(price) || price < 0) return NaN;
+    return Number((BigInt(thousandths) * BigInt(price) + 500n) / 1000n);
+  }
   function totals(items, discount = 0, paid = 0) {
-    if (!items.length || items.some(i => !i.product?.trim() || !['pacote','fardo','kg','un'].includes(i.unit) || !Number.isFinite(i.quantity) || i.quantity <= 0 || i.quantity > 1000000 || !Number.isSafeInteger(i.unit_price_cents) || i.unit_price_cents < 0)) throw new Error('Preencha produto, quantidade e preço de todos os itens.');
-    const subtotal = items.reduce((sum, i) => sum + Math.round(i.quantity * i.unit_price_cents), 0);
+    if (!items.length || items.some(i => !i.product?.trim() || !['pacote','fardo','kg','un'].includes(i.unit) || !Number.isFinite(lineTotal(i.quantity,i.unit_price_cents)))) throw new Error('Preencha produto, quantidade (até 3 casas decimais) e preço de todos os itens.');
+    const subtotal = items.reduce((sum, i) => sum + lineTotal(i.quantity,i.unit_price_cents), 0);
+    if (!Number.isSafeInteger(subtotal)) throw new Error('O valor da venda é muito alto. Confira as quantidades e preços.');
     if (!Number.isSafeInteger(discount) || discount < 0 || discount >= subtotal) throw new Error('O desconto precisa ser menor que o valor dos produtos.');
     const total = subtotal - discount;
     if (!Number.isSafeInteger(paid) || paid < 0 || paid > total) throw new Error('O valor pago deve ficar entre zero e o total da venda.');
@@ -34,5 +40,5 @@
     const received = sales.flatMap(s => s.payments || []).filter(p => p.paid_on.startsWith(month)).reduce((sum,p) => sum + Number(p.amount_cents), 0);
     return { sold: selected.reduce((sum,s) => sum + Number(s.total_cents), 0), received, balance: sales.reduce((sum,s) => sum + Number(s.total_cents) - Number(s.paid_cents), 0), deliveries: selected.length };
   }
-  return { today, currency, dateLabel, number, cents, totals, clientStats, dashboard };
+  return { today, currency, dateLabel, number, cents, lineTotal, totals, clientStats, dashboard };
 });

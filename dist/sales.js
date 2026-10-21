@@ -83,7 +83,7 @@
       const top = [...products.values()].sort((a,b) => b.quantity-a.quantity).slice(0,6);
       $('dashboard-products').innerHTML = top.map(i => `<div class="product-rank"><div><strong>${esc(i.product)}</strong><span>${Number(i.quantity).toLocaleString('pt-BR')} ${units[i.unit]}</span></div><div class="rank-track"><span style="width:${Math.max(3,Math.round(i.quantity/top[0].quantity*100))}%"></span></div></div>`).join('') || empty('Os produtos aparecerão conforme as vendas forem registradas.');
     }
-    const shown = app.getClients().filter(mapMatches).length;
+    const shown = app.getVisibleCount ? app.getVisibleCount() : app.getClients().filter(c => mapMatches(c.id)).length;
     $('activity-filter-note').textContent = `${shown} de ${app.getClients().length} clientes`;
     $('activity-filter').disabled = !S.loaded || Boolean(S.error);
     if ($('client-profile-dialog').open) renderProfile();
@@ -102,7 +102,7 @@
   }
   function saleHistory(s) {
     const balance = Number(s.total_cents)-Number(s.paid_cents);
-    return `<details class="history-sale"><summary><span><strong>Entrega · ${C.dateLabel(s.delivered_on)}</strong><small>${balance ? `Pendente: ${money(balance)}` : 'Pagamento completo'}</small></span><b>${money(s.total_cents)}</b></summary><div class="history-sale-body"><ul>${s.items.map(i => `<li><span>${esc(itemText(i))}<small>${money(i.unit_price_cents)} por ${i.unit === 'un' ? 'unidade' : i.unit}</small></span><b>${money(Math.round(i.quantity*i.unit_price_cents))}</b></li>`).join('')}</ul>${Number(s.discount_cents) ? `<p>Desconto: ${money(s.discount_cents)}</p>` : ''}<p>Pago: <strong>${money(s.paid_cents)}</strong></p>${balance ? `<p class="balance-pending">Saldo: ${money(balance)} · Vencimento: ${C.dateLabel(s.due_on)}</p><button class="secondary-button full" type="button" data-business-payment="${s.id}">Registrar pagamento</button>` : ''}${s.notes ? `<p class="preserve-lines">${esc(s.notes)}</p>` : ''}<h4>Recebimentos</h4>${s.payments.length ? s.payments.map(p => `<p class="payment-entry">${C.dateLabel(p.paid_on)} · ${esc(p.method)} <strong>${money(p.amount_cents)}</strong></p>`).join('') : '<p>Nenhum recebimento registrado.</p>'}</div></details>`;
+    return `<details class="history-sale"><summary><span><strong>Entrega · ${C.dateLabel(s.delivered_on)}</strong><small>${balance ? `Pendente: ${money(balance)}` : 'Pagamento completo'}</small></span><b>${money(s.total_cents)}</b></summary><div class="history-sale-body"><ul>${s.items.map(i => `<li><span>${esc(itemText(i))}<small>${money(i.unit_price_cents)} por ${i.unit === 'un' ? 'unidade' : i.unit}</small></span><b>${money(C.lineTotal(i.quantity,i.unit_price_cents))}</b></li>`).join('')}</ul>${Number(s.discount_cents) ? `<p>Desconto: ${money(s.discount_cents)}</p>` : ''}<p>Pago: <strong>${money(s.paid_cents)}</strong></p>${balance ? `<p class="balance-pending">Saldo: ${money(balance)} · Vencimento: ${C.dateLabel(s.due_on)}</p><button class="secondary-button full" type="button" data-business-payment="${s.id}">Registrar pagamento</button>` : ''}${s.notes ? `<p class="preserve-lines">${esc(s.notes)}</p>` : ''}<h4>Recebimentos</h4>${s.payments.length ? s.payments.map(p => `<p class="payment-entry">${C.dateLabel(p.paid_on)} · ${esc(p.method)} <strong>${money(p.amount_cents)}</strong></p>`).join('') : '<p>Nenhum recebimento registrado.</p>'}</div></details>`;
   }
   function addItem() {
     if ($('sale-items').children.length >= 100) return;
@@ -116,8 +116,8 @@
   }
   function updateTotals() {
     const items = readItems();
-    [...$('sale-items').children].forEach((row,i) => { const value = items[i].quantity*items[i].unit_price_cents; row.querySelector('.item-line-total strong').textContent = money(Number.isFinite(value) ? Math.round(value) : 0); });
-    const subtotal = items.reduce((s,i) => s+(Number.isFinite(i.quantity*i.unit_price_cents) ? Math.round(i.quantity*i.unit_price_cents) : 0),0);
+    [...$('sale-items').children].forEach((row,i) => { const value = C.lineTotal(items[i].quantity,items[i].unit_price_cents); row.querySelector('.item-line-total strong').textContent = money(Number.isFinite(value) ? Math.round(value) : 0); });
+    const subtotal = items.reduce((s,i) => s+(Number.isFinite(C.lineTotal(i.quantity,i.unit_price_cents)) ? C.lineTotal(i.quantity,i.unit_price_cents) : 0),0);
     const total = Math.max(0, subtotal-(C.cents($('sale-discount').value)||0));
     const paid = C.cents($('sale-paid').value)||0;
     $('sale-total').innerHTML = `<small>Total da venda</small><strong>${money(total)}</strong><span>Saldo a receber: ${money(Math.max(0,total-paid))}</span>`;

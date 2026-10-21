@@ -48,6 +48,7 @@
 .popup-business-actions { display: grid; grid-template-columns: 1fr; gap: 5px; margin-top: 10px; }
 .popup-business-actions button { min-height: 40px; border: 1px solid #d3ddfa; color: var(--blue); background: #edf2ff; border-radius: 8px; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 700; }
 .popup-notes { overflow-wrap: anywhere; }
+.client-map-card:has(.leaflet-popup) .client-map-search, .client-map-card:has(.leaflet-popup) .map-instruction { visibility: hidden; pointer-events: none; }
 .balance-pending { color: #a45100 !important; }
 .business-dialog { width: min(680px,calc(100% - 32px)); max-height: 90dvh; border: 1px solid var(--line); border-radius: 20px; padding: 0; color: var(--ink); background: white; box-shadow: 0 24px 90px #0c163044; overscroll-behavior: contain; }
 .business-dialog::backdrop { background: #0c163077; }

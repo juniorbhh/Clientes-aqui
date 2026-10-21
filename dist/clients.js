@@ -203,7 +203,7 @@
     visibleClients().forEach((client) => {
       const clientStatus = client.client_status || "ativo";
       const marker = window.L.marker([client.latitude, client.longitude], { icon: markerIcon(client.category, clientStatus) });
-      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span><span class="popup-status status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}${window.ClientesAquiSales?.popup(client.id) || ""}<div class="popup-notes"><strong>Observações</strong>${escapeHtml(client.notes || "Nenhuma observação cadastrada.")}</div></div>`, { maxWidth: 290 });
+      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span><span class="popup-status status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}${window.ClientesAquiSales?.popup(client.id) || ""}<div class="popup-notes"><strong>Observações</strong>${escapeHtml(client.notes || "Nenhuma observação cadastrada.")}</div></div>`, { maxWidth: Math.min(290, window.innerWidth - 74), maxHeight: 300 });
       marker.on("click", () => highlightClient(client.id));
       marker.addTo(state.markers);
       state.markersByClientId.set(client.id, marker);
@@ -212,6 +212,8 @@
 
   function renderList() {
     const clients = visibleClients();
+    const activityNote = document.querySelector("#activity-filter-note");
+    if (activityNote) activityNote.textContent = `${clients.length} de ${state.clients.length} clientes`;
     els.count.textContent = String(state.clients.length);
     if (!state.clients.length) els.listStatus.textContent = "Nenhum cliente cadastrado";
     else if (state.statusFilter === "all") els.listStatus.textContent = "Mais recentes primeiro";
@@ -608,6 +610,7 @@
 
   window.ClientesAqui = Object.freeze({
     getClients: () => state.clients,
+    getVisibleCount: () => visibleClients().length,
     getUserId: () => state.session?.user?.id || null,
     request: async (path, options = {}) => {
       if (!(await validSession())) { renderAuthState(); throw new Error("Sua sessão expirou. Entre novamente."); }

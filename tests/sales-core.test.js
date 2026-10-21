@@ -5,6 +5,8 @@ test('Brazilian money and fractional kilo sales preserve cent totals',()=>{
  assert.equal(C.cents('1.234,56'),123456);
  assert.equal(C.cents('3,00'),300);
  assert.equal(C.cents('2.50'),250);
+ assert.equal(C.lineTotal(0.29,150),44);
+ assert.ok(Number.isNaN(C.lineTotal(0.0001,150)));
  assert.ok(Number.isNaN(C.cents('-1')));
  const v=C.totals([{product:'Palha',unit:'kg',quantity:1.5,unit_price_cents:2500},{product:'Pimentinha',unit:'fardo',quantity:2,unit_price_cents:3300}],350,5000);
  assert.deepEqual(v,{subtotal:10350,total:10000,paid:5000,balance:5000});
