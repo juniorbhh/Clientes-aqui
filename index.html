@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231238d1'/%3E%3Cpath fill='%23fff' d='M32 12a16 16 0 0 0-16 16c0 12 16 25 16 25s16-13 16-25a16 16 0 0 0-16-16Zm0 22a6 6 0 1 1 0-12 6 6 0 0 1 0 12Z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./business.css?v=1" />
   </head>
   <body>
     <header class="topbar">
@@ -19,16 +20,21 @@
         <span>clientes <strong>aqui</strong></span>
       </a>
       <nav class="topnav" aria-label="Navegação principal" hidden>
-        <button class="nav-link is-active" type="button" data-view-target="search">Buscar</button>
+        <button class="nav-link is-active" type="button" data-view-target="dashboard">Dashboard</button>
+        <button class="nav-link" type="button" data-view-target="search">Buscar</button>
         <button class="nav-link" type="button" data-view-target="clients">Clientes</button>
       </nav>
+        <div class="clients-account" id="clients-account" hidden>
+          <span id="account-email"></span>
+          <button class="text-button" id="signout-button" type="button">Sair</button>
+        </div>
     </header>
 
     <main class="login-shell" id="login-view" data-view="login">
       <section class="auth-card" id="auth-card" aria-labelledby="login-title">
         <div class="auth-copy">
           <span class="auth-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12v10H6V10Zm6 4v2"/></svg></span>
-          <div><p class="eyebrow">CLIENTES AQUI</p><h1 id="login-title">Entre na sua conta</h1><p>Acesse a busca e o mapa dos seus clientes.</p></div>
+          <div><p class="eyebrow">CLIENTES AQUI</p><h1 id="login-title">Entre na sua conta</h1><p>Acompanhe suas vendas, entregas e clientes.</p></div>
         </div>
         <form id="auth-form" class="auth-form" novalidate>
           <label>E-mail<input id="auth-email" type="email" autocomplete="email" placeholder="voce@empresa.com" required /></label>
@@ -175,10 +181,7 @@
           <h1>Seus clientes no mapa</h1>
           <p>Marque no mapa os clientes que você já atende. Cada conta visualiza somente os próprios dados.</p>
         </div>
-        <div class="clients-account" id="clients-account" hidden>
-          <span id="account-email"></span>
-          <button class="text-button" id="signout-button" type="button">Sair</button>
-        </div>
+
       </section>
 
       <section class="clients-workspace" id="clients-workspace" hidden>
@@ -200,6 +203,11 @@
           </div>
         </div>
 
+        <div class="activity-filter-row">
+          <label for="activity-filter">Compras no mapa</label>
+          <select id="activity-filter"><option value="all">Todos os clientes</option><option value="15">Sem comprar há 15 dias ou mais</option><option value="30">Sem comprar há 30 dias ou mais</option><option value="never">Sem compras registradas</option><option value="pending">Com pagamento pendente</option></select>
+          <span id="activity-filter-note" role="status"></span>
+        </div>
         <div class="clients-grid">
           <div class="client-map-card">
             <div class="client-map-search">
@@ -265,8 +273,54 @@
       </section>
     </main>
 
+    <main class="dashboard-shell" id="dashboard-view" data-view="dashboard" hidden>
+      <div class="dashboard-intro"><div><p class="eyebrow">SEU NEGÓCIO EM DIA</p><h1>Vendas e entregas</h1><p>Registre a venda na ficha do cliente, no momento da entrega.</p></div><label class="month-picker">Período<input id="dashboard-month" type="month" /></label></div>
+      <div id="sales-load-message" class="inline-message" role="status" hidden></div>
+      <button type="button" class="secondary-button" id="sales-retry" hidden>Tentar carregar novamente</button>
+      <section class="metric-grid" aria-label="Resumo das vendas" id="dashboard-metrics"></section>
+      <div class="dashboard-columns">
+        <section class="dashboard-card"><div class="section-title"><h2>Últimas entregas</h2><button type="button" class="text-button" id="dashboard-open-clients">Ver clientes</button></div><div id="dashboard-deliveries"></div></section>
+        <section class="dashboard-card"><div class="section-title"><h2>A receber</h2><span>Todos os períodos</span></div><div id="dashboard-receivables"></div></section>
+        <section class="dashboard-card"><div class="section-title"><h2>Hora de voltar</h2><span>15 dias ou mais sem comprar</span></div><div id="dashboard-followups"></div></section>
+        <section class="dashboard-card"><div class="section-title"><h2>Produtos mais vendidos</h2><span>No período selecionado</span></div><div id="dashboard-products"></div></section>
+      </div>
+    </main>
+
+    <dialog id="client-profile-dialog" class="business-dialog" aria-labelledby="profile-title">
+      <header class="dialog-heading"><div><p class="eyebrow">FICHA DO CLIENTE</p><h2 id="profile-title"></h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Fechar ficha">×</button></header>
+      <div class="dialog-body" id="client-profile-content"></div>
+    </dialog>
+    <dialog id="sale-dialog" class="business-dialog" aria-labelledby="sale-title">
+      <form id="sale-form" novalidate>
+        <header class="dialog-heading"><div><p class="eyebrow" id="sale-client-name"></p><h2 id="sale-title">Registrar venda</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="Fechar venda">×</button></header>
+        <div class="dialog-body form-stack">
+          <label>Data da venda e entrega<input id="sale-date" type="date" required /></label>
+          <fieldset class="sale-items-fieldset"><legend>Produtos entregues</legend><div id="sale-items"></div><button id="sale-add-item" class="secondary-button full" type="button">+ Adicionar produto</button></fieldset>
+          <datalist id="sale-products"><option value="Pimentinha"></option><option value="Bolinha de bacon"></option><option value="Pururuca"></option><option value="Batata palha"></option><option value="Batata chips"></option></datalist>
+          <div class="sale-money-fields"><label>Desconto (R$)<input id="sale-discount" type="text" inputmode="decimal" value="0,00" /></label><label>Recebido na entrega (R$)<input id="sale-paid" type="text" inputmode="decimal" placeholder="0,00" /></label></div>
+          <button type="button" class="text-button paid-full-button" id="sale-paid-full">Preencher pagamento total</button>
+          <div class="sale-money-fields"><label>Forma de pagamento<select id="sale-method"><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Outro</option></select></label><label id="sale-due-label">Vencimento do saldo<input id="sale-due" type="date" /></label></div>
+          <label>Observação da venda<textarea id="sale-notes" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label>
+          <div id="sale-error" class="inline-message" data-type="error" role="alert" hidden></div>
+        </div>
+        <footer class="dialog-footer"><div id="sale-total" aria-live="polite"></div><button class="primary-button" id="sale-save" type="submit">Salvar venda e entrega</button></footer>
+      </form>
+    </dialog>
+    <dialog id="visit-dialog" class="business-dialog small-dialog" aria-labelledby="visit-title">
+      <form id="visit-form" novalidate><header class="dialog-heading"><h2 id="visit-title">Visita sem venda</h2><button class="icon-button" type="button" data-close-dialog aria-label="Fechar visita">×</button></header>
+      <div class="dialog-body form-stack"><p id="visit-client-name"></p><label>Data da visita<input id="visit-date" type="date" required /></label><label>Motivo<select id="visit-reason"><option>Ainda tem estoque</option><option>Responsável ausente</option><option>Não quis comprar</option><option>Retornar depois</option><option>Outro</option></select></label><label>Observações<textarea id="visit-notes" rows="3" maxlength="1000" placeholder="Ex.: voltar na próxima semana"></textarea></label><div id="visit-error" class="inline-message" data-type="error" role="alert" hidden></div></div>
+      <footer class="dialog-footer"><button class="primary-button full" type="submit" id="visit-save">Salvar visita</button></footer></form>
+    </dialog>
+    <dialog id="payment-dialog" class="business-dialog small-dialog" aria-labelledby="payment-title">
+      <form id="payment-form" novalidate><header class="dialog-heading"><h2 id="payment-title">Registrar pagamento</h2><button class="icon-button" type="button" data-close-dialog aria-label="Fechar pagamento">×</button></header>
+      <div class="dialog-body form-stack"><p id="payment-balance"></p><label>Valor recebido (R$)<input id="payment-amount" type="text" inputmode="decimal" required /></label><label>Data do recebimento<input id="payment-date" type="date" required /></label><label>Forma de pagamento<select id="payment-method"><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Outro</option></select></label><div id="payment-error" class="inline-message" data-type="error" role="alert" hidden></div></div>
+      <footer class="dialog-footer"><button class="primary-button full" type="submit" id="payment-save">Salvar pagamento</button></footer></form>
+    </dialog>
+    <div id="business-toast" class="business-toast" role="status" hidden></div>
+    <script src="./sales-core.js?v=1"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="./app.js?v=9"></script>
-    <script src="./clients.js?v=3"></script>
+    <script src="./clients.js?v=4"></script>
+    <script src="./sales.js?v=1"></script>
   </body>
 </html>
