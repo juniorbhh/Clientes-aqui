@@ -87,8 +87,8 @@
   }
 
   function visibleClients() {
-    if (state.statusFilter === "all") return state.clients;
-    return state.clients.filter((client) => (client.client_status || "ativo") === state.statusFilter);
+    return state.clients.filter((client) => (state.statusFilter === "all" || (client.client_status || "ativo") === state.statusFilter)
+      && (!window.ClientesAquiSales || window.ClientesAquiSales.matches(client.id)));
   }
 
   function saveSession(session) {
@@ -151,8 +151,9 @@
     els.views.forEach((view) => { view.hidden = view.dataset.view !== name; });
     els.navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.viewTarget === name));
     els.nav.hidden = name === "login";
-    if (updateHash) history.replaceState(null, "", name === "clients" ? "#clientes" : location.pathname + location.search);
+    if (updateHash) history.replaceState(null, "", name === "clients" ? "#clientes" : name === "search" ? "#buscar" : location.pathname + location.search);
     if (name === "clients" && state.map) setTimeout(() => state.map.invalidateSize(), 0);
+    document.dispatchEvent(new CustomEvent("clientes:view", { detail: name }));
   }
 
   function renderAuthState() {
@@ -162,7 +163,7 @@
     els.account.hidden = !signedIn;
     els.accountEmail.textContent = signedIn ? state.session.user.email || "Conta conectada" : "";
     if (signedIn) {
-      showView(location.hash === "#clientes" ? "clients" : "search", false);
+      showView(location.hash === "#clientes" ? "clients" : location.hash === "#buscar" ? "search" : "dashboard", false);
       initializeMap();
       void loadClients();
     } else showView("login");
@@ -202,7 +203,7 @@
     visibleClients().forEach((client) => {
       const clientStatus = client.client_status || "ativo";
       const marker = window.L.marker([client.latitude, client.longitude], { icon: markerIcon(client.category, clientStatus) });
-      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span><span class="popup-status status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}<div class="popup-notes"><strong>Observações</strong>${escapeHtml(client.notes || "Nenhuma observação cadastrada.")}</div></div>`);
+      marker.bindPopup(`<div class="map-popup"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(categoryLabels[client.category] || "Cliente")}</span><span class="popup-status status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ""}${window.ClientesAquiSales?.popup(client.id) || ""}<div class="popup-notes"><strong>Observações</strong>${escapeHtml(client.notes || "Nenhuma observação cadastrada.")}</div></div>`, { maxWidth: Math.min(290, window.innerWidth - 74), maxHeight: 300 });
       marker.on("click", () => highlightClient(client.id));
       marker.addTo(state.markers);
       state.markersByClientId.set(client.id, marker);
@@ -211,6 +212,8 @@
 
   function renderList() {
     const clients = visibleClients();
+    const activityNote = document.querySelector("#activity-filter-note");
+    if (activityNote) activityNote.textContent = `${clients.length} de ${state.clients.length} clientes`;
     els.count.textContent = String(state.clients.length);
     if (!state.clients.length) els.listStatus.textContent = "Nenhum cliente cadastrado";
     else if (state.statusFilter === "all") els.listStatus.textContent = "Mais recentes primeiro";
@@ -229,6 +232,7 @@
           <span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(categoryLabels[client.category] || "Cliente")}${client.address ? ` · ${escapeHtml(client.address)}` : ""}</small><span class="client-status-badge status-${escapeHtml(clientStatus)}">${escapeHtml(statusLabels[clientStatus] || "Ativo")}</span></span>
         </button>
         <div class="client-card-actions">
+          <button type="button" data-business-profile="${escapeHtml(client.id)}">Histórico e vendas</button>
           <button type="button" data-edit-client="${escapeHtml(client.id)}">Editar</button>
           <button class="danger-link" type="button" data-delete-client="${escapeHtml(client.id)}">Excluir</button>
         </div>
@@ -239,7 +243,10 @@
       if (!group.length) return "";
       return `<section class="client-group status-${status}" aria-label="${statusLabels[status]}"><h3>${statusLabels[status]} <span>${group.length}</span></h3>${group.map(renderCard).join("")}</section>`;
     }).join("");
-    els.list.querySelectorAll("[data-focus-client]").forEach((button) => button.addEventListener("click", () => focusClient(button.dataset.focusClient)));
+    els.list.querySelectorAll("[data-focus-client]").forEach((button) => button.addEventListener("click", () => {
+      focusClient(button.dataset.focusClient);
+      window.ClientesAquiSales?.openProfile(button.dataset.focusClient);
+    }));
     els.list.querySelectorAll("[data-edit-client]").forEach((button) => button.addEventListener("click", () => editClient(button.dataset.editClient)));
     els.list.querySelectorAll("[data-delete-client]").forEach((button) => button.addEventListener("click", () => void deleteClient(button.dataset.deleteClient)));
   }
@@ -269,6 +276,7 @@
       })) : [];
       renderList();
       renderMarkers();
+      document.dispatchEvent(new CustomEvent("clientes:updated"));
     } catch (error) {
       state.clients = [];
       renderList();
@@ -393,7 +401,7 @@
       await api(`/rest/v1/clients?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", accessToken: state.session.access_token });
       await loadClients();
     } catch (error) {
-      els.listStatus.textContent = error.message;
+      els.listStatus.textContent = error.code === "23503" ? "Este cliente tem vendas ou visitas salvas. Preserve o histórico e ajuste sua situação." : error.message;
     }
   }
 
@@ -439,6 +447,8 @@
     }
     saveSession(null);
     state.clients = [];
+    closeForm();
+    document.dispatchEvent(new CustomEvent("clientes:signed-out"));
     if (state.markers) state.markers.clearLayers();
     renderAuthState();
   }
@@ -546,7 +556,7 @@
 
   async function initialize() {
     els.navButtons.forEach((button) => button.addEventListener("click", () => showView(button.dataset.viewTarget)));
-    document.querySelector(".brand")?.addEventListener("click", (event) => { event.preventDefault(); showView("search"); });
+    document.querySelector(".brand")?.addEventListener("click", (event) => { event.preventDefault(); showView("dashboard"); });
     els.authForm.addEventListener("submit", signIn);
     els.signup.addEventListener("click", () => void signUp());
     els.signout.addEventListener("click", () => void signOut());
@@ -598,5 +608,22 @@
     }
   }
 
+  window.ClientesAqui = Object.freeze({
+    getClients: () => state.clients,
+    getVisibleCount: () => visibleClients().length,
+    getUserId: () => state.session?.user?.id || null,
+    request: async (path, options = {}) => {
+      if (!(await validSession())) { renderAuthState(); throw new Error("Sua sessão expirou. Entre novamente."); }
+      try { return await api(path, { ...options, accessToken: state.session.access_token }); }
+      catch (error) {
+        if (error.status !== 401) throw error;
+        if (await refreshSession()) return api(path, { ...options, accessToken: state.session.access_token });
+        renderAuthState();
+        throw new Error("Sua sessão expirou. Entre novamente.");
+      }
+    },
+    refreshMap: () => { renderList(); renderMarkers(); },
+    showView,
+  });
   void initialize();
 })();
