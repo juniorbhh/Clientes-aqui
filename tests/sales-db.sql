@@ -16,6 +16,16 @@ begin
  exception when others then blocked := true;
  end;
  if not blocked then raise exception 'Pagamento acima do saldo não foi bloqueado'; end if;
+ result := public.register_sale(cid,(now() at time zone 'America/Sao_Paulo')::date,'[{"product":"Pimentinha","unit":"fardo","quantity":2,"line_total_cents":6600}]'::jsonb,0,0,'Vale',(now() at time zone 'America/Sao_Paulo')::date+7,null,gen_random_uuid());
+ if result.total_cents<>6600 or result.paid_cents<>0 or jsonb_array_length(result.payments)<>0 or result.payment_method<>'Vale' then raise exception 'Vale ou preço total incorreto'; end if;
+ blocked := false;
+ begin
+   perform public.register_sale(cid,(now() at time zone 'America/Sao_Paulo')::date,'[{"product":"Pimentinha","unit":"fardo","quantity":2,"line_total_cents":6600}]'::jsonb,0,100,'Vale',(now() at time zone 'America/Sao_Paulo')::date+7,null,gen_random_uuid());
+ exception when others then blocked := true;
+ end;
+ if not blocked then raise exception 'Vale aceitou recebimento'; end if;
+ result := public.register_sale(cid,(now() at time zone 'America/Sao_Paulo')::date,'[{"product":"Pimentinha","unit":"fardo","quantity":2,"line_total_cents":6600}]'::jsonb,100,6500,'Pix',null,null,gen_random_uuid());
+ if result.total_cents<>6500 or result.paid_cents<>6500 or result.due_on is not null then raise exception 'Pagamento completo incorreto'; end if;
  perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
  blocked := false;
  begin
