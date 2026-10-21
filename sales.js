@@ -122,6 +122,7 @@
     const vale = $('sale-method').value === 'Vale';
     const partial = $('sale-partial').checked;
     $('sale-partial').disabled = vale;
+    $('sale-partial-label').hidden = vale;
     $('sale-paid-label').hidden = vale || !partial;
     $('sale-vale-note').hidden = !vale;
     const paid = C.salePayment(total, $('sale-method').value, partial, $('sale-paid').value);

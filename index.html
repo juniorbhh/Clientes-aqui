@@ -297,10 +297,10 @@
           <label>Data da venda e entrega<input id="sale-date" type="date" required /></label>
           <fieldset class="sale-items-fieldset"><legend>Produtos entregues</legend><div id="sale-items"></div><button id="sale-add-item" class="secondary-button full" type="button">+ Adicionar produto</button></fieldset>
           <datalist id="sale-products"><option value="Pimentinha"></option><option value="Bolinha de bacon"></option><option value="Pururuca"></option><option value="Batata palha"></option><option value="Batata chips"></option></datalist>
-          <div class="sale-money-fields"><label>Desconto (R$)<input id="sale-discount" type="text" inputmode="decimal" value="0,00" /></label><label id="sale-paid-label" hidden>Valor recebido (R$)<input id="sale-paid" type="text" inputmode="decimal" placeholder="0,00" /></label></div>
-          <label class="sale-partial-option"><input id="sale-partial" type="checkbox" /> Cliente não pagou o valor total</label>
+          <div class="sale-money-fields"><label>Desconto (R$)<input id="sale-discount" type="text" inputmode="decimal" value="0,00" /></label><label>Forma de pagamento<select id="sale-method"><option>Pix</option><option value="Vale">VALE</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Outro</option></select></label></div>
+          <label id="sale-partial-label" class="sale-partial-option"><input id="sale-partial" type="checkbox" /> Cliente não pagou o valor total</label>
           <p id="sale-vale-note" class="muted" hidden>Vale: nenhum valor recebido. O total ficará a receber.</p>
-          <div class="sale-money-fields"><label>Forma de pagamento<select id="sale-method"><option>Pix</option><option value="Vale">VALE</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option><option>Outro</option></select></label><label id="sale-due-label">Vencimento do saldo<input id="sale-due" type="date" /></label></div>
+          <div class="sale-money-fields"><label id="sale-paid-label" hidden>Valor recebido (R$)<input id="sale-paid" type="text" inputmode="decimal" placeholder="0,00" /></label><label id="sale-due-label" hidden>Vencimento do saldo<input id="sale-due" type="date" /></label></div>
           <label>Observação da venda<textarea id="sale-notes" rows="2" maxlength="1000" placeholder="Opcional"></textarea></label>
           <div id="sale-error" class="inline-message" data-type="error" role="alert" hidden></div>
         </div>
